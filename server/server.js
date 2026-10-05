@@ -21,6 +21,7 @@ const DRY_RUN = !API_KEY || process.env.ANTHROPIC_DRY_RUN === '1';
 const STATES = new Set(['queued', 'active', 'blocked', 'review', 'done']);
 // Which model a member uses: their own, else the .env default.
 const modelOf = agent => agent.model || MODEL;
+const reviewer = agent => ({...agent,system:`${agent.system}\nFor this peer-feedback task, use these sections instead of your usual reply or caption format: what works, concrete changes, missing facts or questions, and next steps. Review the supplied draft from your role. Do not claim to approve, publish, send, or edit anything. Follow the language of the supplied draft and focus.`});
 
 // ---- storage: one JSON file, written atomically ----
 fs.mkdirSync(DATA_DIR, {recursive: true});
@@ -111,6 +112,16 @@ function newTask(input) {
   return {id: crypto.randomUUID(), title, assignee, brief: text(input.brief, 5000), status: ['done','review'].includes(status) && !result ? 'queued' : status, result, createdAt: now()};
 }
 async function api(req, res, url) {
+  if (url.pathname === '/api/reviews' && req.method === 'POST') {
+    const input=await readJson(req),names=input?.members;
+    if(!Array.isArray(names)||!names.length||names.length>6||new Set(names).size!==names.length||names.some(n=>!MEMBERS.has(n)))return send(res,400,{error:'Choose 1–6 different team members.'});
+    const task=tasks.find(t=>t.id===input.taskId);if(!task?.result)return send(res,404,{error:'This task has no draft to discuss.'});
+    if(input.version!==(task.version||0))return send(res,409,{error:'The draft changed. Refresh and choose the latest version.'});
+    const connected=names.filter(n=>agents[n]);if(!connected.length)return send(res,400,{error:'Invite at least one connected AI agent for feedback.'});
+    const source=structuredClone(task),notes=[];
+    for(const name of connected){const review={title:`Review meeting: ${source.title}`,brief:`Review this existing draft from your role. Give concrete suggestions, missing facts and next steps. Do not approve it, publish it or claim to change the task.\n\nOriginal brief:\n${source.brief}\n\nDraft to review:\n${source.result}\n\nFocus:\n${text(input.focus,2000)||'Clarity, accuracy and completeness.'}${notes.length?`\n\nColleague feedback:\n${notes.map(n=>`${n.name}: ${n.result}`).join('\n\n')}`:''}`};const result=DRY_RUN?await dryRun(agents[name],review):await askClaude(reviewer(agents[name]),review);notes.push({name,result:result.slice(0,10000)});}
+    return send(res,200,{mode:DRY_RUN?'dry-run':'claude',taskId:source.id,sourceVersion:source.version||0,createdAt:now(),stale:(tasks.find(t=>t.id===source.id)?.version||0)!==(source.version||0),notes});
+  }
   if (url.pathname === '/api/tasks/batch' && req.method === 'POST') {
     const input=await readJson(req),list=input?.tasks;
     if(!Array.isArray(list)||!list.length||list.length>13)return send(res,400,{error:'Choose 1–13 tasks.'});
@@ -124,7 +135,7 @@ async function api(req, res, url) {
     const notes=[];
     for(const name of names){
       const task={title:'Coffee break: peer feedback',brief:`Review this topic or draft from your role. Give concrete suggestions, unresolved questions and next steps. Do not claim to take any external action.\n\n${topic}${notes.length?`\n\nFirst colleague feedback:\n${notes[0].result}`:''}`};
-      const answer=DRY_RUN?await dryRun(agents[name],task):await askClaude(agents[name],task);
+      const answer=DRY_RUN?await dryRun(agents[name],task):await askClaude(reviewer(agents[name]),task);
       notes.push({name,result:answer.slice(0,10000)});
     }
     return send(res,200,{mode:DRY_RUN?'dry-run':'claude',createdAt:now(),notes});

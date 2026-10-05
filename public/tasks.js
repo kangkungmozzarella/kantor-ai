@@ -158,6 +158,7 @@
     if (!visible.length) list.append(node('p', tasks.length ? 'No tasks match this filter.' : 'No tasks yet. Add the first job for your team.', 'task-empty'));
     for (const task of visible) {
       const article = node('article', undefined, 'task-item');
+      article.id=`task-${task.id}`;article.tabIndex=-1;
       const agent = agentFor(task.assignee);
       article.append(node('h3', task.title), node('div', `${displayName(task.assignee)} · ${states[task.status]}${agent ? ` · AI agent${agent.mode === 'claude' ? ` · ${agent.model}` : ''}` : ''}`, 'task-meta'));
       if (task.brief) article.append(node('p', task.brief));
@@ -233,6 +234,7 @@
     }, 2500);
   }
   window.officeTasks = {
+    openTask(id){const task=tasks.find(t=>t.id===id);if(!task)return;this.open(task.assignee,task.status);const article=document.getElementById(`task-${id}`);article?.scrollIntoView({block:'nearest'});article?.focus();},
     async createBatch(drafts) {
       if (!Array.isArray(drafts) || !drafts.length || drafts.length > 13 || drafts.some(d => !d.title?.trim() || d.title.length > 160 || !team.some(p => p.n === d.assignee))) throw new Error('Invalid task allocation.');
       if (server) { const saved = await call('POST', '/api/tasks/batch', {tasks:drafts}); apply([...saved, ...tasks]); }

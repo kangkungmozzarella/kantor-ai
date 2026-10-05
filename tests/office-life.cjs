@@ -14,8 +14,15 @@ const api=async(route,body)=>{const response=await fetch(`http://127.0.0.1:${por
     assert.equal((await api('/api/coffee',{members:['Kak Rani','Koh Arman'],topic:'Review the launch'})).status,400);
     browser=await chromium.launch();const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];page.on('pageerror',error=>errors.push(error.message));
     await page.goto(`http://127.0.0.1:${port}`);await page.waitForFunction(()=>window.officeScene&&window.officeTasks.agentFor('Kak Rani'));
+    await page.click('#bRoutine');
     await page.click('#bLife');assert.equal(await page.locator('#personalityList li').count(),13);
     await page.selectOption('#officeMood','night');await page.waitForFunction(()=>officeScene.lifeSnapshot().mood==='night');
+    assert.deepEqual(await page.evaluate(()=>officeScene.lifeSnapshot().litFloors),[3],'night lights belong only to the visible floor');
+    await page.click('#closeLife');await page.click('[data-floor="4"]');assert.deepEqual(await page.evaluate(()=>officeScene.lifeSnapshot().litFloors),[4]);
+    await page.click('[data-floor="0"]');await page.waitForFunction(()=>!officeScene.snapshot().transitioning);assert.deepEqual(await page.evaluate(()=>officeScene.lifeSnapshot().litFloors),[1,2,3,4]);
+    await page.screenshot({path:path.join(os.tmpdir(),'kantor-night-building.png')});
+    await page.click('[data-floor="3"]');await page.waitForFunction(()=>!officeScene.snapshot().transitioning);assert.deepEqual(await page.evaluate(()=>officeScene.lifeSnapshot().litFloors),[3]);
+    await page.screenshot({path:path.join(os.tmpdir(),'kantor-night-workspace.png')});await page.click('#bLife');
     await page.selectOption('#officeMood','morning');await page.waitForFunction(()=>officeScene.lifeSnapshot().mood==='morning');
     await page.click('#petCat');assert.equal(await page.evaluate(()=>officeScene.lifeSnapshot().cat.petting),true);assert.match(await page.locator('#catStatus').innerText(),/purrs/);
     await page.selectOption('#coffeeFirst','Kak Rani');await page.selectOption('#coffeeSecond','Kak Sinta');await page.fill('#coffeeTopic','Review a launch announcement for existing customers.');await page.check('#coffeeAI');

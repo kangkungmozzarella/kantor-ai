@@ -1,0 +1,21 @@
+.studio-shortcuts{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:12px 0 28px}
+.studio-shortcuts a{color:#385747;text-decoration:underline;padding:12px 0}
+#lifeDialog .task-header,.studio-dialog .task-header{position:sticky;top:0;z-index:2;background:#f7f3eb;padding:12px 0;border-bottom:1px solid #d7cec0}
+.life-layout>section:nth-child(3),.life-layout>section:nth-child(4){grid-column:1/-1;border-top:1px solid #c9c2b6;padding-top:24px}
+.studio-options{display:grid;grid-template-columns:1fr 1fr;gap:32px}
+.studio-dialog{width:min(860px,calc(100% - 24px));box-sizing:border-box;max-height:85dvh;overflow:auto;background:#f7f3eb;color:#2a2622;border:1px solid #385747;border-radius:12px;padding:24px;font:14px/1.5 var(--sans);user-select:text}
+.studio-dialog::backdrop{background:rgba(42,38,34,.5)}
+.studio-dialog h1{font-size:26px;margin:0}.studio-dialog h2{font-size:18px;margin:0 0 8px}
+.studio-dialog label{display:block;margin:18px 0 8px;font-weight:600}
+.studio-dialog select,.studio-dialog textarea{box-sizing:border-box;width:100%;min-height:44px;padding:10px;background:#fffdf8;color:#2a2622;border:1px solid #827c71;border-radius:5px;font:inherit}
+.studio-dialog button{min-height:44px;margin:12px 8px 0 0;padding:10px 14px;border:1px solid #385747;border-radius:5px;background:#385747;color:#fff;font:inherit;cursor:pointer}
+.studio-dialog .task-header button{margin:0}.studio-dialog button:disabled{opacity:.6;cursor:wait}
+.studio-dialog :focus-visible,.studio-shortcuts a:focus-visible{outline:3px solid #b4623a;outline-offset:3px}
+.work-entry{padding:20px 0;border-bottom:1px solid #c9c2b6}.work-entry p{margin:8px 0}.work-entry pre,.studio-dialog pre{font:inherit;white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;background:#fffdf8;padding:12px;border:1px solid #d7cec0;border-radius:5px}
+#reviewPeople{margin-top:18px;border:1px solid #c9c2b6;display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
+#reviewPeople label,.studio-dialog .studio-check{display:flex;gap:10px;align-items:center;min-height:44px;margin:0;font-weight:400}
+#reviewPeople input,.studio-check input{width:20px;height:20px;accent-color:#385747}
+#reviewAvailability,#reviewFeedback,#studioFeedback{color:#385747}#reviewSource:empty,#reviewNotes:empty{display:none}
+.studio-dialog pre{scrollbar-gutter:stable}
+#tourBar{position:fixed;left:50%;transform:translateX(-50%);top:110px;padding:8px 12px;display:flex;align-items:center;gap:16px;z-index:8;background:#f7f3eb;color:#2a2622}#tourBar[hidden]{display:none}
+@media(max-width:700px){.studio-options{grid-template-columns:1fr;gap:24px}.studio-dialog{padding:20px 16px}.life-layout>section:nth-child(3),.life-layout>section:nth-child(4){grid-column:auto}#reviewPeople{grid-template-columns:1fr}#tourBar{top:auto;bottom:150px;max-width:calc(100% - 24px);width:max-content}}

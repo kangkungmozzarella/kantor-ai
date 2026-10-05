@@ -3,17 +3,22 @@
 #lifeDialog h2{font-size:18px;margin:0 0 12px}
 #lifeDialog .task-header{margin-bottom:16px}
 #lifeDialog::backdrop{background:rgba(42,38,34,.5)}
-.life-layout{display:grid;grid-template-columns:1fr 1fr;gap:24px}
-.life-layout section:last-child{grid-column:1/-1;border-top:1px solid #c9c2b6;padding-top:18px}
-.life-layout label{display:block;margin:12px 0 6px;font-weight:600}
+.life-layout{display:grid;grid-template-columns:1fr 1fr;column-gap:32px;row-gap:32px}
+.life-layout section:last-child{grid-column:1/-1;border-top:1px solid #c9c2b6;padding-top:24px}
+.life-layout label{display:block;margin:18px 0 8px;font-weight:600}
 .life-layout input:not([type=checkbox]),.life-layout select,.life-layout textarea{display:block;width:100%;box-sizing:border-box;min-height:44px;padding:10px;background:#fffdf8;color:#2a2622;border:1px solid #827c71;border-radius:5px;font:inherit}
 #lifeDialog button{min-height:44px;padding:9px 14px;border:1px solid #385747;border-radius:5px;background:#385747;color:#fff;font:inherit;cursor:pointer}
+.life-layout form>button{margin-top:16px}
+#petCat{margin-top:12px}
+#catStatus{margin:16px 0 24px}
+#coffeeAvailability{margin:12px 0 0}
+#saveCoffee,#createDivision{margin-top:16px}
 #lifeDialog button:disabled{opacity:.6;cursor:wait}
 #lifeDialog :focus-visible{outline:3px solid #b4623a;outline-offset:3px}
 .life-layout .life-check{display:flex;align-items:center;gap:10px;min-height:44px;font-weight:400}
 .life-check input{width:20px;height:20px;accent-color:#385747}
 #personalityList{padding-left:20px;font-size:13px;line-height:1.7}
 #coffeeNotes{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.6;max-height:320px;overflow:auto}
-#lifeFeedback{color:#385747}#lifeFeedback:empty{display:none}
+#lifeFeedback{color:#385747;margin:16px 0 24px}#lifeFeedback:empty{display:none}
 #divisionPreview{margin:16px 0}
-@media(max-width:700px){#lifeDialog{padding:16px}.life-layout{grid-template-columns:1fr;gap:18px}.life-layout section:last-child{grid-column:auto}#header .header-card{flex-wrap:wrap}#bLife{min-height:44px}}
+@media(max-width:700px){#lifeDialog{padding:20px 16px}.life-layout{grid-template-columns:1fr;gap:28px}.life-layout section:last-child{grid-column:auto}#header .header-card{flex-wrap:wrap}#bLife{min-height:44px}}

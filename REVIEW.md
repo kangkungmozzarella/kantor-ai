@@ -237,6 +237,18 @@ Kontras dihitung dengan rumus WCAG dan script antislop: teks utama 14.45:1, teks
 Tidak ada eksekusi AI, sinkronisasi antarperangkat/tab, atau impor JSON. Pengujian mobile memakai viewport Chromium, bukan perangkat fisik. Three.js masih dimuat melalui CDN prototipe.
 ## Office life — October 2026
 
+### Work board, review, decorations and tours
+
+Arahan melanjutkan interior kayu hangat, panel gading, aksen hijau tua; ENERGY 2 / RHYTHM 2 / MOTION 1. Status monitor memakai data tugas pemiliknya. Papan berisi hasil dan status nyata, dengan akses keyboard melalui Work board di Office life. Review menyebut versi draf dan tidak menyetujui pekerjaan. Anggota tanpa koneksi AI tetap berlabel simulasi. Catatan dry-run berlabel jelas.
+
+Dekorasi berupa pilihan warna furnitur/daun dan dua poster, tanpa mengubah denah. Hujan digambar di luar footprint gedung sebagai satu batch garis; audio berupa noise tersaring, opt-in dan tidak autoplay. Tur berhenti saat input kamera manual, dapat dijeda, dan menjadi sudut diam untuk reduced motion. Pergerakan hujan juga dilewati untuk reduced motion. Lampu tetap mengikuti lantainya.
+
+Panel baru memakai dialog native, label/fokus terlihat, target 44px, satu kolom di ponsel dan header Close yang tetap terlihat saat scroll. Screenshot Appearance & tours pada 375/768/1440px serta workspace berhujan ditinjau. tests/office-studio.cjs memeriksa status/klik monitor, hasil kerja, exact task navigation, review dua agen tanpa approval, guard versi lama, dekorasi tersimpan, weather/audio/tours dan reduced motion. Regresi tests/office-life.cjs lulus setelah penambahan fitur. Pengujian memakai dry-run, tidak menjalankan model berbayar.
+
+Pemeriksaan akhir: tests/server.cjs dan tests/office-studio.cjs lulus, termasuk klik papan 3D dan penanda stale ketika tugas berubah saat review berlangsung. Pemeriksaan sintaks dan git diff --check bersih.
+
+Perbaikan mode malam: lampu dan strip cahaya menjadi bagian dari lantainya, sehingga lantai tersembunyi tidak menyisakan lampu melayang. Regresi memeriksa lampu Workspace, Rooftop, seluruh gedung dan kembali ke Workspace; screenshot malam Workspace ditinjau.
+
 Arahan mengikuti kantor hangat yang sudah ada: kayu, sage, panel gading; kontrol Office life menggunakan hijau tua untuk tindakan. Tidak menambah gaya visual baru. ENERGY 2 / RHYTHM 2 / MOTION 1: gerak kecil membantu membaca kegiatan, jeda tetap berlaku dan preferensi reduced motion menonaktifkan rutinitas bawaan serta gerak selebrasi.
 
 Panel berisi kegiatan kantor, coffee break, dan brief divisi dengan preview sebelum penyimpanan. Elemen memakai label, fokus terlihat, tombol minimal 44px, dialog native dengan Escape, dan satu kolom pada layar sempit. Tugas divisi disimpan atomik. Tanggapan AI berasal dari endpoint server; dry-run berlabel dan aktivitas karakter tetap disebut simulasi.

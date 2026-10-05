@@ -140,4 +140,18 @@ Tombol **Office life** membuka panel kegiatan dan pembagian tugas. Teks antarmuk
 
 Jalankan ulang server dan reload halaman setelah perubahan. `tests/office-life.cjs` memeriksa penyimpanan batch, feedback coffee break, unduhan, interaksi/jeda kucing, kebiasaan, selebrasi, pencahayaan tersimpan, panel responsif dan pembagian tugas tanpa server. Tes memakai server sementara dalam dry-run dan tidak memanggil AI berbayar.
 
+## Work board, review, decorations and tours
+
+Di **Office life**, **Work board** membuka pekerjaan nyata beserta draf, pertanyaan agen dan hasil selesai. Filter status membantu menemukan pekerjaan yang perlu ditinjau. **Open task** membawa ke tugas yang tepat; **Discuss this draft** membuka rapat review. Papan 3D di workspace juga dapat diklik, dan kini menampilkan pekerjaan selesai bersama tugas yang menunggu review/keputusan. Monitor meja menampilkan status tugas pemiliknya; klik sisi depan monitor untuk membuka tugas anggota tersebut. Anggota tanpa tugas menampilkan **Idle**. **Finished** di monitor adalah status tugas, bukan kehadiran online.
+
+**Review meeting** memakai draf yang sudah ada. Pilih tugas dan 1–6 anggota; kursi ruang rapat diperiksa sebelum siapa pun dipindahkan. Anggota tetap di ruang rapat sampai diberi perintah baru atau **Send invitees back to work**. Centang **Ask connected agents for feedback** jika ingin masukan AI; saat ini KR dan KS. Anggota lainnya hadir sebagai simulasi. Server mengirim satu permintaan model per anggota tersambung, berurutan, dengan draf, instruksi asli dan masukan sebelumnya. Catatan menyebut versi draf sumber; permintaan dari versi lama ditolak dan perubahan selama review diberi penanda. Review tidak mengubah tugas, menyetujui, merevisi atau menerbitkan hasil. Persetujuan dan revisi tetap dilakukan lewat **Tasks**. Catatan dapat diunduh sebagai teks; tanpa key, hasil berlabel **DRY RUN**.
+
+Di **Appearance & tours**, pilih warna kursi/karpet, warna daun tanaman, dan salah satu poster kantor. **Team colours / Original greens** memulihkan warna bawaan. Pilihan tersimpan di browser, bukan di server. Dekorasi tidak memindahkan furnitur atau mengubah jalur berjalan.
+
+**Outside the windows** menawarkan **Clear**, **Rain**, dan **Sunset**. Hujan merupakan simulasi visual di luar footprint gedung, bukan cuaca sungguhan. Sunset memberi cahaya sore tanpa mengubah pilihan Lighting yang disimpan; Clear mengembalikan pencahayaan pilihan itu. **Play rain sound** memainkan noise tersaring lewat Web Audio; volumenya tersimpan. Audio selalu mati setelah reload dan dimulai dengan klik pengguna. Suara hujan dan Music memiliki kontrol terpisah.
+
+**Camera tours** menyediakan orbit workspace, mengikuti Moka, dan orbit gedung. Klik **Start camera tour** untuk menutup panel dan mulai; **Stop tour**, Escape, drag, wheel, keyboard kamera, pemilihan lantai/anggota, atau kontrol kamera menghentikan tur. **Pause** menjeda tur serta hujan visual. Reduced motion memberikan sudut kamera diam dan tetes hujan tanpa animasi.
+
+`tests/office-studio.cjs` menggunakan server sementara dalam dry-run untuk memeriksa status/klik monitor, papan hasil, navigasi tugas, review versi draf, dekorasi tersimpan, cuaca/audio, tur, gangguan kamera manual, viewport 375/768/1440px dan reduced motion. `public/studio.js` mengelola panel serta audio; `public/studio.css` menata panel; geometri, cuaca dan kamera tetap di `public/office.js`.
+
 `tests/server.cjs` memeriksa siklus draf, revisi, persetujuan, dan pemulihan tulisan setelah polling/reload dengan dry-run. `tests/worker-reliability.cjs` memakai provider lokal tiruan untuk memeriksa error terlambat setelah pengalihan tugas. Pengujian ini tidak memanggil AI berbayar.
