@@ -233,6 +233,12 @@
     }, 2500);
   }
   window.officeTasks = {
+    async createBatch(drafts) {
+      if (!Array.isArray(drafts) || !drafts.length || drafts.length > 13 || drafts.some(d => !d.title?.trim() || d.title.length > 160 || !team.some(p => p.n === d.assignee))) throw new Error('Invalid task allocation.');
+      if (server) { const saved = await call('POST', '/api/tasks/batch', {tasks:drafts}); apply([...saved, ...tasks]); }
+      else { const added=drafts.map(d=>({id:crypto.randomUUID(),title:d.title,brief:d.brief||'',assignee:d.assignee,status:'queued',result:'',createdAt:new Date().toISOString()})); if(!persist([...added,...tasks])) throw new Error('Tasks could not be saved.'); }
+      render();
+    },
     activeFor: name => tasks.find(t => t.assignee === name && t.status === 'active'),
     list: () => tasks.map(t => ({...t})),
     agentFor,

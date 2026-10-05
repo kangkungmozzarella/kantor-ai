@@ -111,6 +111,24 @@ function newTask(input) {
   return {id: crypto.randomUUID(), title, assignee, brief: text(input.brief, 5000), status: ['done','review'].includes(status) && !result ? 'queued' : status, result, createdAt: now()};
 }
 async function api(req, res, url) {
+  if (url.pathname === '/api/tasks/batch' && req.method === 'POST') {
+    const input=await readJson(req),list=input?.tasks;
+    if(!Array.isArray(list)||!list.length||list.length>13)return send(res,400,{error:'Choose 1–13 tasks.'});
+    const added=list.map(item=>newTask({...item,status:'queued',result:''}));
+    if(added.some(t=>!t||!MEMBERS.has(t.assignee)))return send(res,400,{error:'Every task needs a title and a known assignee.'});
+    tasks.unshift(...added);save();send(res,201,added);setImmediate(kick);return;
+  }
+  if (url.pathname === '/api/coffee' && req.method === 'POST') {
+    const input=await readJson(req),names=input?.members,topic=text(input?.topic,3000);
+    if(!Array.isArray(names)||names.length!==2||names[0]===names[1]||names.some(n=>!agents[n])||!topic)return send(res,400,{error:'Choose two connected AI agents and enter a topic.'});
+    const notes=[];
+    for(const name of names){
+      const task={title:'Coffee break: peer feedback',brief:`Review this topic or draft from your role. Give concrete suggestions, unresolved questions and next steps. Do not claim to take any external action.\n\n${topic}${notes.length?`\n\nFirst colleague feedback:\n${notes[0].result}`:''}`};
+      const answer=DRY_RUN?await dryRun(agents[name],task):await askClaude(agents[name],task);
+      notes.push({name,result:answer.slice(0,10000)});
+    }
+    return send(res,200,{mode:DRY_RUN?'dry-run':'claude',createdAt:now(),notes});
+  }
   if (url.pathname === '/api/agents' && req.method === 'GET')
     return send(res, 200, {mode: DRY_RUN ? 'dry-run' : 'claude', model: DRY_RUN ? null : MODEL, members: Object.fromEntries(Object.entries(agents).map(([name, a]) => [name, {role: a.role, model: modelOf(a)}]))});
   if (url.pathname === '/api/tasks' && req.method === 'GET') return send(res, 200, tasks);

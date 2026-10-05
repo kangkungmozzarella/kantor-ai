@@ -235,3 +235,10 @@ Kontras dihitung dengan rumus WCAG dan script antislop: teks utama 14.45:1, teks
 ## Batas versi ini
 
 Tidak ada eksekusi AI, sinkronisasi antarperangkat/tab, atau impor JSON. Pengujian mobile memakai viewport Chromium, bukan perangkat fisik. Three.js masih dimuat melalui CDN prototipe.
+## Office life — October 2026
+
+Arahan mengikuti kantor hangat yang sudah ada: kayu, sage, panel gading; kontrol Office life menggunakan hijau tua untuk tindakan. Tidak menambah gaya visual baru. ENERGY 2 / RHYTHM 2 / MOTION 1: gerak kecil membantu membaca kegiatan, jeda tetap berlaku dan preferensi reduced motion menonaktifkan rutinitas bawaan serta gerak selebrasi.
+
+Panel berisi kegiatan kantor, coffee break, dan brief divisi dengan preview sebelum penyimpanan. Elemen memakai label, fokus terlihat, tombol minimal 44px, dialog native dengan Escape, dan satu kolom pada layar sempit. Tugas divisi disimpan atomik. Tanggapan AI berasal dari endpoint server; dry-run berlabel dan aktivitas karakter tetap disebut simulasi.
+
+Validasi: tests/server.cjs dan tests/worker-reliability.cjs lulus. tests/office-life.cjs lulus untuk batch invalid tanpa tugas parsial, cat pet/pause, kebiasaan, selebrasi setelah approval, pencahayaan tersimpan, coffee dua agen berurutan, unduhan catatan, localStorage tanpa server dan lebar 375/768/1440px tanpa overflow dialog atau error JavaScript. Screenshot panel desktop dan ponsel ditinjau; jarak header diperketat setelah review. API model berbayar tidak dipanggil dalam pengujian.

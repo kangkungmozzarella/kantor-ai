@@ -127,4 +127,17 @@ Hasil manual dan komentar revisi disimpan sementara di sessionStorage tab browse
 
 Worker memakai identitas eksekusi: hasil atau error terlambat tidak mengubah tugas yang sudah dialihkan. API memvalidasi penanggung jawab dan batas satu tugas aktif per orang. Jalankan ulang server setelah memperbarui kode backend.
 
+## Office life
+
+Tombol **Office life** membuka panel kegiatan dan pembagian tugas. Teks antarmuka tetap bahasa Inggris.
+
+- **Moka, kucing kantor:** berkeliling di workspace, tidur di sofa dan mengunjungi meja anggota tanpa tugas aktif. Klik kucing dalam tampilan lantai 3 atau **Pet the office cat** untuk mengelusnya. **Pause** menghentikan gerakannya; **Routine: off** menghentikan perjalanan baru.
+- **Celebrate finished tasks:** anggota mengangkat tangan sebentar ketika tugas manual selesai atau draf AI disetujui. Draf yang masih menunggu review tidak memicu selebrasi. Bisa dimatikan; gerak selebrasi dilewati untuk preferensi reduced motion.
+- **Team habits:** anggota punya kecenderungan rutinitas yang berbeda: kopi, papan ide, lounge, ngobrol, peregangan atau menyiram tanaman. Ini kepribadian simulasi, bukan informasi tentang orang aslinya.
+- **Lighting:** bawaan mengikuti jam perangkat: pagi 06–12, siang 12–16, sore 16–19, malam 19–06. Bisa memilih suasana manual. Suasana diperbarui setiap menit; cahaya hangat kantor menyala pada sore dan malam. Pilihan pencahayaan dan selebrasi disimpan di browser.
+- **Coffee break:** pilih dua anggota untuk pergi ke pantry bersama, lalu kembali ke meja setelah keduanya tiba dan beristirahat. Dua tempat pantry harus tersedia. Jika keduanya tersambung ke agen AI (saat ini KR dan KS), isi topik dan centang **Ask both AI agents for feedback**. Server membuat dua permintaan model berurutan; agen kedua membaca tanggapan pertama. Tanpa API key, catatan berlabel dry run. **Download notes** menyimpan catatan sebagai teks; catatan tidak otomatis disimpan ke tugas atau dipublikasikan.
+- **Division brief:** pilih divisi, isi tujuan dan fakta, lalu **Preview task allocation**. Pembagian mengikuti peran anggota, satu tugas per orang. Mengubah brief membatalkan preview lama. **Create these tasks** menyimpan seluruh pembagian sekaligus di server atau localStorage. Anggota dengan agen AI mengambil tugas otomatis; anggota lain tetap manual. Pembagian ini memakai aturan peran, bukan klaim bahwa planner AI sudah menilai dependensi tugas.
+
+Jalankan ulang server dan reload halaman setelah perubahan. `tests/office-life.cjs` memeriksa penyimpanan batch, feedback coffee break, unduhan, interaksi/jeda kucing, kebiasaan, selebrasi, pencahayaan tersimpan, panel responsif dan pembagian tugas tanpa server. Tes memakai server sementara dalam dry-run dan tidak memanggil AI berbayar.
+
 `tests/server.cjs` memeriksa siklus draf, revisi, persetujuan, dan pemulihan tulisan setelah polling/reload dengan dry-run. `tests/worker-reliability.cjs` memakai provider lokal tiruan untuk memeriksa error terlambat setelah pengalihan tugas. Pengujian ini tidak memanggil AI berbayar.

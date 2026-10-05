@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;700&display=swap">
   <link rel="stylesheet" href="office.css">
   <link rel="stylesheet" href="tasks.css">
+  <link rel="stylesheet" href="life.css">
 </head>
 <body class="ui">
   <canvas id="c" aria-label="Interactive model of a four-floor office"></canvas>
@@ -21,6 +22,7 @@
       <div id="teamFaces" aria-label="Team members"></div>
       <button id="bLog" class="btn" aria-controls="log" aria-expanded="true">Log</button>
       <button id="bTasks" class="btn primary">Tasks <span id="taskCount">0</span></button>
+      <button id="bLife" class="btn">Office life</button>
     </div>
   </header>
   <nav id="floors" aria-label="Choose a floor">
@@ -70,7 +72,17 @@
       </section>
     </div>
   </dialog>
+  <dialog id="lifeDialog" aria-labelledby="lifeHeading">
+    <header class="task-header"><div><h1 id="lifeHeading">Office life</h1><p>Small rituals, shared ideas and division briefs.</p></div><button id="closeLife" type="button">Close</button></header>
+    <p id="lifeFeedback" role="status"></p>
+    <div class="life-layout">
+      <section><h2>The everyday office</h2><label for="officeMood">Lighting</label><select id="officeMood"><option value="auto">Follow local time</option><option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option><option value="night">Night</option></select><p id="moodDescription"></p><label class="life-check"><input type="checkbox" id="celebrations" checked> Celebrate finished tasks</label><button id="petCat" type="button">Pet the office cat</button><p id="catStatus">Meet Moka, our office cat.</p><h3>Team habits</h3><ul id="personalityList"></ul></section>
+      <section><h2>Coffee break</h2><form id="coffeeForm"><label for="coffeeFirst">First person</label><select id="coffeeFirst" required></select><label for="coffeeSecond">Second person</label><select id="coffeeSecond" required></select><label for="coffeeTopic">Topic or task to discuss</label><textarea id="coffeeTopic" maxlength="3000" rows="3" placeholder="Paste the draft or describe the question"></textarea><label class="life-check"><input type="checkbox" id="coffeeAI"> Ask both AI agents for feedback</label><p id="coffeeAvailability"></p><button type="submit">Invite for coffee</button></form><pre id="coffeeNotes" tabindex="0"></pre><button id="saveCoffee" type="button" hidden>Download notes</button></section>
+      <section><h2>Division brief</h2><form id="divisionForm"><label for="briefDivision">Division</label><select id="briefDivision"></select><label for="divisionGoal">Shared goal</label><input id="divisionGoal" required maxlength="160" placeholder="Prepare our new product launch"><label for="divisionContext">Facts, audience and expected result</label><textarea id="divisionContext" required maxlength="4000" rows="4"></textarea><button type="submit">Preview task allocation</button></form><div id="divisionPreview"></div><button id="createDivision" type="button" hidden>Create these tasks</button></section>
+    </div>
+  </dialog>
   <script src="tasks.js"></script>
+  <script src="life.js"></script>
   <script src="music.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="office.js"></script>
