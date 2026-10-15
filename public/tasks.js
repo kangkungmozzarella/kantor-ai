@@ -2,7 +2,7 @@
   const storageKey = 'kantor-ai.tasks.v1';
   const states = {queued: 'Queued', active: 'In progress', blocked: 'Needs decision', review: 'Needs review', done: 'Done'};
   const el = id => document.getElementById(id);
-  let tasks = [], team = [], changed, locate;
+  let tasks = [], team = [], changed, locate, handedOff = () => {};
   let storageHealthy = true;
   let mutation=0,polling=false,writing=0;
   const drafts=new Map();
@@ -17,6 +17,37 @@
   const agentFor = name => server?.members[name] ? {...server.members[name], mode: server.mode} : null;
 
   function feedback(message) { el('taskFeedback').textContent = message; }
+
+  // Stuck work: an agent error right away, otherwise no change for longer than the chosen limit.
+  // "member" means the assignee is holding it up, so someone could take over; "you" means it waits on a person's review or answer.
+  const STALL_KEY = 'kantor-ai.stall.v1', STALL_OPTIONS = [1, 2, 4, 24];
+  let stallHours = 2;
+  try { const saved = Number(localStorage.getItem(STALL_KEY)); if (STALL_OPTIONS.includes(saved)) stallHours = saved; } catch {}
+  const ago = ms => ms < 3600000 ? `${Math.max(1, Math.round(ms / 60000))} min` : ms < 172800000 ? `${Math.floor(ms / 3600000)} h` : `${Math.floor(ms / 86400000)} days`;
+  function stuck(task, now = Date.now()) {
+    if (task.status === 'done') return null;
+    if (task.status === 'queued' && task.error) return {kind: 'member', reason: `The agent could not finish: ${task.error}`, short: 'Agent error'};
+    const age = now - Date.parse(task.updatedAt || task.createdAt);
+    if (!(age >= stallHours * 3600000)) return null;
+    const time = ago(age);
+    return {
+      blocked: {kind: 'you', reason: `Waiting ${time} for your answer.`, short: `Waiting on you · ${time}`},
+      review: {kind: 'you', reason: `Draft waiting ${time} for your review.`, short: `Review waiting · ${time}`},
+      active: {kind: 'member', reason: `No update for ${time}.`, short: `Stuck · ${time}`},
+      queued: {kind: 'member', reason: `Not started for ${time}.`, short: `Stuck · ${time}`}
+    }[task.status] || null;
+  }
+  // Who could take over: same role first, then the same division, then whoever is free with the fewest open tasks.
+  function takeoverFor(task) {
+    const owner = team.find(p => p.n === task.assignee);
+    if (!owner) return [];
+    return team.filter(p => p.n !== owner.n).map(p => {
+      const open = tasks.filter(t => t.assignee === p.n && t.status !== 'done').length, busy = tasks.some(t => t.assignee === p.n && t.status === 'active');
+      const family = role => role.replace(/ (Leader|Intern|Specialist)$/, ''), sameRole = family(p.role) === family(owner.role), sameGroup = p.group === owner.group;
+      const why = [sameRole ? 'same role' : sameGroup ? 'same division' : null, busy ? 'busy now' : 'free now', `${open} open ${open === 1 ? 'task' : 'tasks'}`].filter(Boolean).join(' · ');
+      return {person: p, why, score: (p.role === owner.role ? 1 : 0) + (sameRole ? 4 : 0) + (sameGroup ? 2 : 0) + (busy ? 0 : 2) - open};
+    }).sort((a, b) => b.score - a.score).slice(0, 2);
+  }
   function persist(next) {
     if (!storageHealthy) {
       feedback('Saved data cannot be read. Changes are blocked so the old data is not overwritten.');
@@ -85,16 +116,74 @@
     render(); feedback(`Task status: ${states[status]}.`);
     el('taskFilter').focus();
   }
-  async function reassign(id, assignee) {
+  async function reassign(id, assignee, takeover = false) {
     if (!team.some(person => person.n === assignee)) return;
+    const before = tasks.find(t => t.id === id);
     if (server) {
       try { const saved = await call('PATCH', `/api/tasks/${id}`, {assignee}); apply(tasks.map(t => t.id === id ? saved : t)); }
       catch (error) { feedback(error.message); return; }
     } else {
-      const next = tasks.map(task => task.id === id ? {...task, assignee, status: task.status === 'done' ? 'done' : 'queued'} : task);
+      const next = tasks.map(task => task.id === id ? {...task, assignee, status: task.status === 'done' ? 'done' : 'queued', error: undefined, updatedAt: new Date().toISOString()} : task);
       if (!persist(next)) return;
     }
-    render(); feedback(`Task moved to ${displayName(assignee)}.`);
+    if (takeover && before) handedOff(before.assignee, assignee, before.title, 'takeover');
+    render(); feedback(`Task moved to ${displayName(assignee)}${takeover ? '. It is back in the queue for them.' : '.'}`);
+  }
+  // Handing a finished result to a teammate creates their follow-up task with the result in the brief.
+  async function handoff(task, assignee, title, note) {
+    try {
+      if (server) {
+        const {source, task: created} = await call('POST', `/api/tasks/${task.id}/handoff`, {assignee, title, note, version: task.version || 0});
+        apply([created, ...tasks.map(t => t.id === source.id ? source : t)]);
+      } else {
+        const at = new Date().toISOString(), owner = team.find(p => p.n === task.assignee);
+        const brief = `Handed over by ${task.assignee} (${owner?.role || 'team member'}) from the finished task "${task.title}".${note ? `\n\nNote: ${note}` : ''}\n\nResult to build on:\n${task.result}`.slice(0, 5000);
+        const created = {id: crypto.randomUUID(), title, assignee, brief, status: 'queued', result: '', createdAt: at, handoffFrom: {id: task.id, assignee: task.assignee, title: task.title}};
+        if (!persist([created, ...tasks.map(t => t.id === task.id ? {...t, handoff: undefined, handedTo: [...(t.handedTo || []), {id: created.id, assignee, at}], updatedAt: at} : t)])) return;
+      }
+      draftClear(`handoff:${task.id}`);
+      handedOff(task.assignee, assignee, title, 'handoff');
+      render(); feedback(`Handed to ${displayName(assignee)}: ${title}.${agentFor(assignee) ? ' The AI agent will pick it up.' : ''}`);
+    } catch (error) { feedback(error.message); }
+  }
+  function stuckControls(task, article, problem) {
+    const box = node('div', undefined, `task-stuck ${problem.kind}`);
+    if (!task.error) box.append(node('p', problem.reason));
+    if (problem.kind === 'you') { box.append(node('p', task.status === 'review' ? 'Approve it or request a revision below.' : 'Answer the questions below so the work can continue.', 'task-stuck-hint')); article.append(box); return; }
+    const options = takeoverFor(task);
+    if (options.length) {
+      box.append(node('p', 'Who could take over:', 'task-stuck-hint'));
+      const row = node('div', undefined, 'task-actions');
+      for (const {person, why} of options) {
+        const button = action(`Move to ${person.initials}`, () => reassign(task.id, person.n, true));
+        button.title = `${person.initials} · ${person.role} · ${why}`;
+        const choice = node('div', undefined, 'takeover-choice'); choice.append(button, node('span', `${person.role} · ${why}`));
+        row.append(choice);
+      }
+      box.append(row);
+    }
+    article.append(box);
+  }
+  function handoffControls(task, article) {
+    const hint = task.handoff && team.some(p => p.n === task.handoff.assignee) ? task.handoff : null;
+    if (task.handedTo?.length) article.append(node('p', `Handed to ${task.handedTo.map(h => displayName(h.assignee)).join(', ')}.`, 'task-agent'));
+    if (task.status === 'review') { if (hint) article.append(node('p', `${displayName(task.assignee)} suggests ${displayName(hint.assignee)} continues with "${hint.title}". Approve the draft to hand it off.`, 'task-handoff-hint')); return; }
+    if (task.status !== 'done' || !task.result || !team.some(p => p.n === task.assignee)) return;
+    const details = node('details', undefined, 'task-handoff'); details.open = !!hint && !task.handedTo?.length;
+    details.append(node('summary', hint ? `Hand off to ${displayName(hint.assignee)} (suggested)` : 'Hand off to a teammate'));
+    const form = node('form'), id = `handoff-${task.id}`, saved = draftRead(`handoff:${task.id}`);
+    const toLabel = node('label', 'Next person'), to = node('select'); to.id = `${id}-to`; toLabel.htmlFor = to.id;
+    for (const person of team.filter(p => p.n !== task.assignee)) { const option = node('option', `${person.initials} · ${person.role}`); option.value = person.n; to.append(option); }
+    if (hint) to.value = hint.assignee;
+    const titleLabel = node('label', 'Their task'), title = node('input'); title.id = `${id}-title`; titleLabel.htmlFor = title.id; title.maxLength = 160; title.required = true; title.value = hint?.title || `Follow up: ${task.title}`.slice(0, 160);
+    const noteLabel = node('label', 'Note '), note = node('textarea'); note.id = `${id}-note`; noteLabel.htmlFor = note.id; noteLabel.append(node('span', '(optional)')); note.rows = 2; note.maxLength = 1000; note.value = saved;
+    note.oninput = () => draftWrite(`handoff:${task.id}`, note.value);
+    const submit = node('button', 'Hand off'); submit.type = 'submit'; submit.className = 'task-primary';
+    form.append(toLabel, to, titleLabel, title, noteLabel, note, node('p', 'The finished result goes into their brief.', 'task-note'), submit);
+    form.onsubmit = event => { event.preventDefault(); if (!title.value.trim()) { title.reportValidity(); return; } handoff(task, to.value, title.value.trim(), note.value.trim()); };
+    // The form is built only while open, so a long list of finished work stays light.
+    const sync = () => { if (details.open && !form.isConnected) details.append(form); else if (!details.open) form.remove(); };
+    details.ontoggle = sync; sync(); article.append(details);
   }
   async function reviewTask(task,action,comments=''){
     try{
@@ -153,15 +242,19 @@
     el('taskCount').textContent = tasks.length - done;
     el('taskSummary').textContent = `${tasks.length} tasks · ${done} done`;
     el('exportTasks').disabled = tasks.length === 0;
-    const visible = tasks.filter(t => (el('taskFilter').value === 'all' || t.status === el('taskFilter').value) &&
+    const filter = el('taskFilter').value, now = Date.now();
+    const visible = tasks.filter(t => (filter === 'all' || (filter === 'stuck' ? stuck(t, now) : t.status === filter)) &&
       (el('agentFilter').value === 'all' || t.assignee === el('agentFilter').value));
     if (!visible.length) list.append(node('p', tasks.length ? 'No tasks match this filter.' : 'No tasks yet. Add the first job for your team.', 'task-empty'));
     for (const task of visible) {
       const article = node('article', undefined, 'task-item');
       article.id=`task-${task.id}`;article.tabIndex=-1;
       const agent = agentFor(task.assignee);
-      article.append(node('h3', task.title), node('div', `${displayName(task.assignee)} · ${states[task.status]}${agent ? ` · AI agent${agent.mode === 'claude' ? ` · ${agent.model}` : ''}` : ''}`, 'task-meta'));
+      const problem = stuck(task, now);
+      article.append(node('h3', task.title), node('div', `${displayName(task.assignee)} · ${states[task.status]}${agent ? ` · AI agent${agent.mode === 'claude' ? ` · ${agent.model}` : ''}` : ''}${task.handoffFrom ? ` · from ${displayName(task.handoffFrom.assignee)}` : ''}`, 'task-meta'));
+      if (problem) { const flag = node('span', problem.short, `task-flag ${problem.kind}`); article.querySelector('.task-meta').append(' ', flag); }
       if (task.brief) article.append(node('p', task.brief));
+      if (problem && team.some(person => person.n === task.assignee)) stuckControls(task, article, problem);
       if(task.history?.length){const history=node('details'),summary=node('summary',`Draft history (${task.history.length})`);history.append(summary);task.history.forEach((draft,i)=>{history.append(node('h4',`Draft ${i+1} · ${draft.by||'Saved'}`));if(draft.feedback)history.append(node('p',`Revision brief: ${draft.feedback}`));history.append(node('div',draft.result,'task-result'));});article.append(history);}
       const actions = node('div', undefined, 'task-actions');
       if (!team.some(person => person.n === task.assignee)) {
@@ -173,8 +266,8 @@
         article.append(select, actions); list.append(article); continue;
       }
       actions.append(action('Show character', () => { el('taskDialog').close(); locate(task.assignee); }));
-      if (agent) { agentActions(task, article, actions); list.append(article); continue; }
-      if(task.status==='review'){reviewControls(task,article);article.append(actions);list.append(article);continue;}
+      if (agent) { agentActions(task, article, actions); handoffControls(task, article); list.append(article); continue; }
+      if(task.status==='review'){reviewControls(task,article);handoffControls(task,article);article.append(actions);list.append(article);continue;}
       if (task.status === 'queued') actions.append(action('Start task', () => update(task.id, 'active')));
       if (task.status === 'active') {
         actions.append(action('Back to queue', () => update(task.id, 'queued')));
@@ -196,6 +289,7 @@
       } else {
         if (task.status === 'done') article.append(node('div', task.result, 'task-result'));
         article.append(actions);
+        handoffControls(task, article);
       }
       list.append(article);
     }
@@ -242,6 +336,8 @@
       render();
     },
     activeFor: name => tasks.find(t => t.assignee === name && t.status === 'active'),
+    stuck: task => stuck(task),
+    get stallHours() { return stallHours; },
     list: () => tasks.map(t => ({...t})),
     agentFor,
     open(name, status = 'all') {
@@ -251,8 +347,8 @@
       el('taskDialog').showModal();
       el('taskTitle').focus();
     },
-    init(people, onChange, onLocate) {
-      team = people; changed = onChange; locate = onLocate;
+    init(people, onChange, onLocate, onHandoff) {
+      team = people; changed = onChange; locate = onLocate; if (onHandoff) handedOff = onHandoff;
       for (const person of team) {
         for (const id of ['taskAssignee', 'agentFilter']) {
           const option = node('option', `${displayName(person.n)} · ${person.role}`); option.value = person.n; el(id).append(option);
@@ -271,6 +367,10 @@
         const option = node('option', `${name} (old prototype)`); option.value = name; el('agentFilter').append(option);
       }
       el('closeTasks').onclick = () => el('taskDialog').close();
+      el('stallHours').value = String(stallHours);
+      el('stallHours').onchange = () => { stallHours = Number(el('stallHours').value); try { localStorage.setItem(STALL_KEY, String(stallHours)); } catch {} render(); };
+      // Time alone can make work stuck, so look again every minute. The open list is left alone while someone types in it.
+      setInterval(() => { if (el('taskDialog').open && el('taskList').contains(document.activeElement)) announce(); else render(); }, 60000);
       el('taskFilter').onchange = render; el('agentFilter').onchange = render;
       el('taskForm').onsubmit = async event => {
         event.preventDefault();

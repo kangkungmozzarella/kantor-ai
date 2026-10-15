@@ -255,3 +255,5 @@ body{--i-list:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' 
 .decisions::before{content:'?';display:inline-grid;place-items:center;width:18px;height:18px;margin-right:8px;border-radius:50%;background:#e0a23a;color:#fff;font-size:12px}
 .decisions:hover{background:#ffe7bb}
 .ui .decisions{width:calc(100% - 36px);margin:0 18px 12px}
+.stuck-work{background:#fdeee9;color:#8a3420}.stuck-work::before{content:'!';background:#e8634a}.stuck-work:hover{background:#fbdcd2}
+.ui .name-label.stuck{border-color:#e0a23a;box-shadow:0 0 0 2px #f6dca8}.ui .name-label.waiting{border-color:#5b7fb5;box-shadow:0 0 0 2px #d3dff0}

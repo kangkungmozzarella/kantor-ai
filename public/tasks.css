@@ -15,3 +15,10 @@ dialog#taskDialog{position:fixed;inset:0;margin:auto;width:min(960px,calc(100% -
 @media(max-width:640px){dialog#taskDialog{width:100%;max-width:none;max-height:100dvh;height:100dvh;border-radius:0;padding:20px 16px;padding-bottom:max(20px,env(safe-area-inset-bottom))}.task-layout{grid-template-columns:1fr;gap:28px}.task-header h1{font-size:22px}.task-filters{grid-template-columns:1fr}.task-header p{max-width:220px}}
 .task-agent{color:#2f6b47;font-size:13px}.task-error{color:#a33a24;font-size:13px}
 .task-questions{background:#fff7e6;border-color:#f0d9a8}
+.task-filters{grid-template-columns:1fr 1fr 1fr}
+.task-flag{display:inline-block;padding:1px 8px;border-radius:10px;font:600 11px var(--sans);vertical-align:1px}.task-flag.member{background:#fff1d6;color:#7a4d0e}.task-flag.you{background:#e6edf7;color:#2c4a73}
+.task-stuck{margin-top:12px;padding:12px;border-radius:8px;border:1px solid #f0d9a8;background:#fffaf0}.task-stuck.you{border-color:#c9d6ea;background:#f4f7fc}.task-stuck p{margin:0 0 6px}.task-stuck-hint{color:var(--ink-2);font-size:13px}.task-stuck .task-actions{margin-top:6px}
+.takeover-choice{display:flex;flex-direction:column;align-items:flex-start;gap:4px;font-size:12px;color:var(--ink-2)}
+.task-handoff{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:8px}.task-handoff summary{cursor:pointer;font-weight:600;min-height:28px}.task-handoff label:first-of-type{margin-top:4px!important}
+.task-handoff-hint{color:#2c4a73;font-size:13px}
+@media(max-width:640px){.task-filters{grid-template-columns:1fr}}

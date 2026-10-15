@@ -38,8 +38,18 @@ function save() {
   } catch(error) { tasks=JSON.parse(durable); throw error; }
 }
 const now = () => new Date().toISOString();
-const MEMBERS = new Set(['Koh Arman','Koh Wira','Kak Rani','Kak Dewi','Mira','Tari','Bagas Pratama Putra','Rizky Hakim','Yoga','Bang Eko','Gilang','Kak Sinta','Kak Laras']);
+// Same names and roles as TEAM in public/office.js.
+const ROLES = {'Koh Arman':'CEO','Koh Wira':'CTO','Kak Rani':'Social Media Specialist','Kak Dewi':'Digital Marketing','Mira':'Business Development','Tari':'Social Media Intern','Bagas Pratama Putra':'Frontend Engineer','Rizky Hakim':'Backend Engineer','Yoga':'Product Design','Bang Eko':'Graphic Designer','Gilang':'Customer Service Leader','Kak Sinta':'Customer Service','Kak Laras':'Customer Service'};
+const MEMBERS = new Set(Object.keys(ROLES));
 const text = (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : '';
+// Agents may suggest who continues from their draft. A person approves the handoff; nothing moves on its own.
+const withHandoff = (agent, self) => ({...agent, system: `${agent.system}\nIf a teammate should continue from your draft, end with one line: HANDOFF: <exact name> | <short task title for them>. Only suggest someone from this list, never yourself, and only when the next step clearly belongs to them:\n${Object.entries(ROLES).filter(([n]) => n !== self).map(([n, r]) => `- ${n} (${r})`).join('\n')}`});
+function splitHandoff(answer, self) {
+  const match = answer.match(/\n?HANDOFF:\s*([^|\n]+?)\s*\|\s*([^\n]+)\s*$/);
+  if (!match) return {answer, handoff: null};
+  const assignee = match[1].trim(), title = text(match[2], 160), rest = answer.slice(0, match.index).trim();
+  return {answer: rest || answer, handoff: MEMBERS.has(assignee) && assignee !== self && title ? {assignee, title} : null};
+}
 
 // ---- agent worker: one task at a time per connected member, oldest first ----
 const busy = new Set();
@@ -63,7 +73,9 @@ async function dryRun(agent, task) {
   await new Promise(resolve => setTimeout(resolve, Number(process.env.DRY_RUN_DELAY_MS ?? 4000)));
   // Dry runs ask back when the brief is nearly empty, so the "Needs decision" flow can be tried without a key.
   if ((task.brief || '').trim().length < 12) return 'QUESTIONS:\n1. DRY RUN: who is this for, and what should it say?\n2. DRY RUN: any facts, links or deadlines to include?';
-  return `DRY RUN: no ANTHROPIC_API_KEY is set, so this is placeholder text, not AI output.\n\n${agent.role} would draft: "${task.title}".\nBrief received: ${task.brief || '(none)'}${task.feedback ? `\nRevision requested: ${task.feedback}` : ''}`;
+  // Customer service drafts suggest a follow-up for social media, so the handoff flow can be tried without a key.
+  const next = agent.role === 'Customer Service' && Object.keys(agents).find(n => agents[n].role === 'Social Media Specialist');
+  return `DRY RUN: no ANTHROPIC_API_KEY is set, so this is placeholder text, not AI output.\n\n${agent.role} would draft: "${task.title}".\nBrief received: ${task.brief || '(none)'}${task.feedback ? `\nRevision requested: ${task.feedback}` : ''}${next ? `\nHANDOFF: ${next} | DRY RUN: social post answering this customer question` : ''}`;
 }
 async function work(name) {
   if (busy.has(name)) return;
@@ -74,15 +86,16 @@ async function work(name) {
   try {
     Object.assign(task, {status: 'active', runId, version:(task.version||0)+1, updatedAt: now()}); save();
     const input=structuredClone(task);
-    const answer = DRY_RUN ? await dryRun(agents[name], input) : await askClaude(agents[name], input);
+    const raw = DRY_RUN ? await dryRun(agents[name], input) : await askClaude(withHandoff(agents[name], name), input);
     const current = tasks.find(t => t.id === task.id);
     // The task may have been moved back to the queue or reassigned while the agent worked.
     if (current && current.status === 'active' && current.assignee === name && current.runId === runId) {
-      const by=DRY_RUN?'dry-run':modelOf(agents[name]),asked=answer.match(/^QUESTIONS:\s*([\s\S]+)/);
+      const by=DRY_RUN?'dry-run':modelOf(agents[name]),asked=raw.match(/^QUESTIONS:\s*([\s\S]+)/);
       // The agent asked instead of guessing: park the task until someone answers.
       if(asked){Object.assign(current,{status:'blocked',questions:asked[1].trim().slice(0,2000),askedBy:by,runId:null,version:(current.version||0)+1,updatedAt:now()});save();return;}
+      const {answer,handoff}=splitHandoff(raw,name);
       const draft={result:answer.slice(0,10000),by,createdAt:now(),feedback:input.feedback||''};
-      Object.assign(current, {status:'review',result:draft.result,by:draft.by,history:[...(current.history||[]),draft],runId:null,version:(current.version||0)+1,updatedAt:now()});save();
+      Object.assign(current, {status:'review',result:draft.result,by:draft.by,handoff:handoff||undefined,history:[...(current.history||[]),draft],runId:null,version:(current.version||0)+1,updatedAt:now()});save();
     }
   } catch (error) {
     const current = tasks.find(t => t.id === task.id);
@@ -161,6 +174,20 @@ async function api(req, res, url) {
     // Imported work that was in progress by hand goes back to the queue.
     tasks.forEach(task => { if (task.status === 'active') task.status = 'queued'; });
     save(); kick(); return send(res, 201, tasks);
+  }
+  // Handoff: a finished result becomes the starting point of a new task for a teammate.
+  const handing = url.pathname.match(/^\/api\/tasks\/([0-9a-f-]{36})\/handoff$/);
+  if (handing && req.method === 'POST') {
+    const source = tasks.find(t => t.id === handing[1]); if (!source) return send(res, 404, {error: 'Task not found.'});
+    const input = await readJson(req), assignee = text(input?.assignee, 80), title = text(input?.title, 160), note = text(input?.note, 1000);
+    if (source.status !== 'done' || !source.result) return send(res, 409, {error: 'Approve or finish this task before handing it off.'});
+    if (input?.version !== (source.version || 0)) return send(res, 409, {error: 'This task changed. Refresh and try again.'});
+    if (!MEMBERS.has(assignee) || assignee === source.assignee) return send(res, 400, {error: 'Pick a different team member to continue.'});
+    if (!title) return send(res, 400, {error: 'Give the follow-up task a title.'});
+    const intro = `Handed over by ${source.assignee} (${ROLES[source.assignee] || 'team member'}) from the finished task "${source.title}".${note ? `\n\nNote: ${note}` : ''}\n\nResult to build on:\n`;
+    const task = {...newTask({title, assignee, brief: (intro + source.result).slice(0, 5000)}), handoffFrom: {id: source.id, assignee: source.assignee, title: source.title}};
+    Object.assign(source, {handoff: undefined, handedTo: [...(source.handedTo || []), {id: task.id, assignee, at: now()}], version: (source.version || 0) + 1, updatedAt: now()});
+    tasks.unshift(task); save(); send(res, 201, {source, task}); setImmediate(kick); return;
   }
   const match = url.pathname.match(/^\/api\/tasks\/([0-9a-f-]{36})$/);
   if (match && req.method === 'PATCH') {

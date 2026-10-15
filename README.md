@@ -155,3 +155,18 @@ Di **Appearance & tours**, pilih warna kursi/karpet, warna daun tanaman, dan sal
 `tests/office-studio.cjs` menggunakan server sementara dalam dry-run untuk memeriksa status/klik monitor, papan hasil, navigasi tugas, review versi draf, dekorasi tersimpan, cuaca/audio, tur, gangguan kamera manual, viewport 375/768/1440px dan reduced motion. `public/studio.js` mengelola panel serta audio; `public/studio.css` menata panel; geometri, cuaca dan kamera tetap di `public/office.js`.
 
 `tests/server.cjs` memeriksa siklus draf, revisi, persetujuan, dan pemulihan tulisan setelah polling/reload dengan dry-run. `tests/worker-reliability.cjs` memakai provider lokal tiruan untuk memeriksa error terlambat setelah pengalihan tugas. Pengujian ini tidak memanggil AI berbayar.
+
+## Tugas mandek, ambil alih, dan serah-terima
+
+**Tugas mandek.** Tugas dianggap mandek bila agen gagal (langsung), atau tidak berubah lebih lama dari batas **Flag as stuck after** di panel Tasks (1 jam, 2 jam, 4 jam atau 1 hari; bawaan 2 jam, tersimpan di browser). Ada dua jenis:
+
+- **Stuck** (kuning): penanggung jawab yang menahan, yaitu belum dimulai, tidak ada update, atau agen error. Kartu tugas menampilkan dua saran **Move to …**: peran yang sama didahulukan, lalu divisi yang sama, lalu yang sedang bebas dengan tugas terbuka paling sedikit. Alasannya tertulis di bawah tombol. Memindahkan tugas mengembalikannya ke antrean orang baru.
+- **Waiting on you** (biru): draf menunggu review atau pertanyaan agen menunggu jawaban. Tidak ada saran ambil alih karena yang perlu bertindak adalah peninjau.
+
+Filter **Stuck or waiting** tersedia di Tasks dan Work board. Office log menampilkan tombol "N stuck · … · see who can take over". Di kantor 3D, avatar yang tugasnya mandek berdiri di atas lingkaran berdenyut (kuning atau biru), label namanya ikut berwarna, monitor mejanya menampilkan "Stuck · 5 h", dan papan kerja mendahulukan tugas mandek. Mandek dihitung dari `updatedAt` tugas, bukan dari status online.
+
+**Serah-terima (handoff).** Tugas yang sudah selesai atau disetujui punya bagian **Hand off to a teammate**: pilih orang berikutnya, judul tugasnya dan catatan opsional. Tugas baru dibuat dengan hasil tadi di dalam brief (`handoffFrom` menunjuk tugas asal; tugas asal mencatat `handedTo`). Agen AI boleh menyarankan orang berikutnya lewat baris `HANDOFF: <nama> | <judul>` di akhir drafnya. Server menghapus baris itu dari draf dan menyimpannya sebagai saran yang sudah terisi di form. Serah-terima tetap butuh klik manusia, dan draf harus disetujui dulu. Dalam dry run, draf Customer Service selalu menyarankan Social Media Specialist supaya alurnya bisa dicoba tanpa API key.
+
+Saat serah-terima atau ambil alih, pemberi berjalan ke meja penerima sambil membawa map, dengan garis lengkung putus-putus di antara kedua meja. Bubble menampilkan "For you!" / "Over to you!" dan penerima menjawab "Got it!". Kejadiannya tercatat di Office log. Animasinya simulasi; tugasnya sendiri sudah dipindahkan saat tombol diklik.
+
+`tests/stuck-handoff.cjs` mengisi server dry-run dengan tugas lama untuk memeriksa penanda mandek (lingkaran, label, monitor, tombol log), filter dan batas waktu, urutan saran ambil alih, pemindahan dari error agen, saran handoff dari agen, penjaga API (draf belum disetujui, diri sendiri, versi lama), form handoff, animasi map dan layout 375/768px.

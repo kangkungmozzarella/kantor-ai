@@ -887,13 +887,19 @@
     mesh(new THREE.CylinderGeometry(.12,.12,.2,12),ACCENT,0,0,0,rig.wateringCan,false);
     const spout=mesh(new THREE.CylinderGeometry(.025,.045,.25,8),ACCENT,0,.02,.18,rig.wateringCan,false);spout.rotation.x=1.1;
     const handle=mesh(new THREE.TorusGeometry(.12,.025,6,12),ACCENT,0,.12,-.04,rig.wateringCan,false);handle.rotation.y=Math.PI/2;rig.wateringCan.visible=false;
+    // A manila folder for handoffs, held in the right hand like the cup and phone.
+    rig.folder=new THREE.Group();rig.arms[1].elbow.add(rig.folder);rig.folder.position.set(0,-.36,.16);rig.folder.rotation.set(-.35,0,0);
+    mesh(softBox(.34,.44,.035),0xe0b25a,0,0,0,rig.folder,false);mesh(new THREE.BoxGeometry(.28,.36,.012),CARD,0,.03,.022,rig.folder,false);rig.folder.visible=false;
+    // Stuck work shows as a pulsing ring on the floor, so it reads from above without covering the name label.
+    const halo=new THREE.Mesh(new THREE.RingGeometry(.72,.98,40),new THREE.MeshBasicMaterial({color:linear(0xe0a23a),transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false}));
+    halo.rotation.x=-Math.PI/2;halo.position.y=.05;halo.visible=false;g.add(halo);
     const bubble=new THREE.Sprite(bubbleMaterial);bubble.scale.set(.75,.45,1);bubble.center.set(-.3,-.1);bubble.visible=false;g.add(bubble);
     const label=document.createElement('button');label.className='name-label';label.type='button';label.textContent=person.initials;
     label.title=`${person.initials}, ${person.role}`;label.setAttribute('aria-label',`View ${person.initials}, ${person.role}`);$('labels').append(label);
     const desk=desks[person.n];g.position.set(desk.x,0,desk.z);g.rotation.y=facing(desk);floors[3].add(g);
     const aisle=desk.route[0][0],stretchZ=desk.z-desk.f*.95;
     const stretchSpot={x:desk.x,z:stretchZ,f:desk.f,floor:3,route:[[aisle,P3],[aisle,stretchZ]],state:'stretch',local:true,label:'Standing up'};
-    const agent={...person,index,g,rig,bubble,label,desk,stretchSpot,heading:facing(desk),floor:3,spot:desk,path:[],destination:desk,state:'work',stairTrip:null,activity:null,visitor:null,nextRoutine:rand(6,25)};
+    const agent={...person,index,g,rig,bubble,halo,stuck:null,label,desk,stretchSpot,heading:facing(desk),floor:3,spot:desk,path:[],destination:desk,state:'work',stairTrip:null,activity:null,visitor:null,nextRoutine:rand(6,25)};
     label.onclick=()=>selectAgent(agent);g.traverse(o=>{o.userData.agent=agent;});return agent;
   }
 
@@ -1113,7 +1119,7 @@
   function arrive(agent) {
     const spot=agent.destination;agent.spot=spot;agent.state=spot.state||(spot.floor===3?'work':'break');
     const activity=agent.activity;
-    if(activity?.spot===spot){if(activity.meeting)settleMeeting(activity.meeting);else activity.until=simTime+activity.duration;}
+    if(activity?.spot===spot){if(activity.meeting)settleMeeting(activity.meeting);else activity.until=simTime+activity.duration;if(activity.handoff)deliver(agent,activity.handoff);}
     if(spot===agent.desk&&agent.nextRoutine<simTime+8)agent.nextRoutine=simTime+rand(8,25);
   }
   function settleMeeting(meeting) {
@@ -1243,11 +1249,12 @@
     if(talking&&state!=='call'&&!walking)arm[1]=[(sitting?-.7:-.5)+Math.sin(t*3+i)*.25,.25,-1.1+Math.sin(t*4.3)*.2];
     if(state==='call')arm[1]=[-.3,.38,-2.55];
     if(state==='water')arm[1]=[-1.1,.18,-.3];
+    if(agent.carrying&&state!=='stairs')arm[1]=[-.6,.12,-1.3];
     if(agent.celebrateUntil>simTime&&!walking&&state!=='stairs'&&!matchMedia('(prefers-reduced-motion: reduce)').matches&&window.officeLife.preferences.celebrate){arm=[[-2.4,.35,-.5],[-2.4,.35,-.5]];bodyY+=Math.abs(Math.sin(t*8))*.06;}
     const sway=walking?Math.sin(t*7.2+i*1.7)*.035:Math.sin(t*1.2+i)*.008;
     blendPose(agent.rig,leg,arm,bodyY+(walking?0:Math.sin(t*1.5+i)*.008),bodyZ,lean,dt,sway);
     cup.visible=state==='drink'||(!walking&&agent.spot?.roofPose==='coffee');phone.visible=state==='call';agent.rig.wateringCan.visible=state==='water';
-    agent.rig.cue.visible=!walking&&agent.spot?.roofPose==='billiard';
+    agent.rig.cue.visible=!walking&&agent.spot?.roofPose==='billiard';agent.rig.folder.visible=!!agent.carrying&&!cup.visible&&!phone.visible;
     // Seated people turn only their head toward whoever they talk with.
     let look=walking?Math.max(-.4,Math.min(.4,wrap(agent.heading-agent.g.rotation.y))):Math.sin(t*.45+i*2)*.08;
     if(partner&&sitting){const q=partner.g.position,p=agent.g.position;look=Math.max(-.9,Math.min(.9,wrap(Math.atan2(q.x-p.x,q.z-p.z)-agent.g.rotation.y)));}
@@ -1335,6 +1342,8 @@
       const p=agent.g.position,q=partner?.g.position;
       agent.heading=q&&!sitting?Math.atan2(q.x-p.x,q.z-p.z):facing(agent.spot);
     }
+    agent.carrying=(agent.activity?.handoff&&!agent.activity.handoff.delivered)||agent.folderUntil>simTime;
+    if(agent.stuck){const k=reduceMotion?0:(Math.sin(simTime*3+agent.index)+1)/2;agent.halo.scale.setScalar(1+k*.18);agent.halo.material.opacity=.9-k*.35;}
     const turn=wrap(agent.heading-agent.g.rotation.y);agent.g.rotation.y+=turn*Math.min(1,dt*(Math.abs(turn)>1.3?14:8));
     pose(agent,state,walking,sitting,talking,partner,dt);
     agent.bubble.visible=talking;agent.bubble.position.set(0,sitting?2.05:2.55,0);
@@ -1390,7 +1399,7 @@
   function syncTaskDisplay(agent){
     const task=window.officeTasks.activeFor(agent.n);
     agent.label.classList.toggle('has-task',!!task);
-    const description=`${agent.initials}, ${agent.role}${task?` · In progress: ${task.title}`:''}`;
+    const description=`${agent.initials}, ${agent.role}${task?` · In progress: ${task.title}`:''}${agent.stuck?` · ${agent.stuck.problem.short}: ${agent.stuck.task.title}`:''}`;
     if(agent.label.title!==description){agent.label.title=description;agent.label.setAttribute('aria-label',`View ${description}`);}
     if(selected===agent&&$('iActiveTask')){
       const title=task?task.title:'No active task';
@@ -1671,11 +1680,46 @@
     if(!bubble){bubble=document.createElement('span');bubble.className='say';bubble.setAttribute('aria-hidden','true');agent.label.append(bubble);}
     bubble.textContent=text;bubble.classList.toggle('drafting',text==='Drafting…');
   }
+  // Handoffs and takeovers: the giver walks the folder over to the receiver's desk, along a dashed arc between the two desks.
+  const handoffLines=[],arcMaterial=new THREE.LineDashedMaterial({color:linear(0xe8634a),dashSize:.28,gapSize:.18,transparent:true,opacity:.9});
+  const courierMaterial=new THREE.MeshBasicMaterial({color:linear(0xe0b25a)});
+  function handoff(from,to,title,kind='handoff'){
+    const giver=agents.find(a=>a.n===from),receiver=agents.find(a=>a.n===to);if(!giver||!receiver||giver===receiver)return false;
+    const a=giver.desk,b=receiver.desk,curve=new THREE.QuadraticBezierCurve3(new THREE.Vector3(a.x,1.7,a.z),new THREE.Vector3((a.x+b.x)/2,3.4,(a.z+b.z)/2),new THREE.Vector3(b.x,1.7,b.z));
+    const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(40)),arcMaterial);line.computeLineDistances();floors[3].add(line);
+    const courier=new THREE.Mesh(new THREE.OctahedronGeometry(.13),courierMaterial);floors[3].add(courier);
+    const entry={from,to,title,kind,line,courier,curve,delivered:false,until:simTime+40};handoffLines.push(entry);
+    if(receiver.visitor&&receiver.visitor!==giver)clearActivity(receiver.visitor);
+    clearActivity(giver);assign(giver,visitSpot(receiver),5,{handoff:entry});receiver.visitor=giver;
+    log(kind==='takeover'?`${from} hands over "${title}" to ${to}`:`${from} hands "${title}" to ${to}`,giver.group);
+    return true;
+  }
+  function deliver(giver,entry){
+    if(entry.delivered)return;entry.delivered=true;entry.until=Math.min(entry.until,simTime+3);
+    const receiver=agents.find(a=>a.n===entry.to);say(giver,entry.kind==='takeover'?'Over to you!':'For you!');
+    if(receiver){receiver.folderUntil=simTime+4;setTimeout(()=>say(receiver,'Got it!'),900);}
+  }
+  function stepHandoffs(){
+    for(const entry of [...handoffLines]){
+      if(simTime>entry.until){floors[3].remove(entry.line,entry.courier);entry.line.geometry.dispose();entry.courier.geometry.dispose();handoffLines.splice(handoffLines.indexOf(entry),1);continue;}
+      const t=reduceMotion?.5:(simTime*.45)%1;entry.courier.position.copy(entry.curve.getPoint(t));entry.courier.rotation.y=simTime*2;
+    }
+  }
+  // Stuck markers follow the task list: the most pressing problem per person, the assignee's own before one that waits on you.
+  function syncStuck(){
+    const list=window.officeTasks.list();
+    for(const a of agents){
+      const problems=list.filter(t=>t.assignee===a.n).map(t=>({task:t,problem:window.officeTasks.stuck(t)})).filter(p=>p.problem).sort((x,y)=>(x.problem.kind==='member'?0:1)-(y.problem.kind==='member'?0:1));
+      a.stuck=problems[0]||null;a.halo.visible=!!a.stuck;
+      if(a.stuck)a.halo.material.color.copy(linear(a.stuck.problem.kind==='member'?0xe0a23a:0x5b7fb5));
+      a.label.classList.toggle('stuck',a.stuck?.problem.kind==='member');a.label.classList.toggle('waiting',a.stuck?.problem.kind==='you');
+    }
+  }
   // Task board and log summary follow the task list, whether it lives in the browser or on the server.
   function drawBoard(){
     const ctx=boardCanvas.getContext('2d'),W=boardCanvas.width,H=boardCanvas.height;
-    const priority={blocked:0,review:1,active:2,done:3,queued:4};
-    const open=window.officeTasks.list().sort((a,b)=>priority[a.status]-priority[b.status]||(b.updatedAt||b.createdAt).localeCompare(a.updatedAt||a.createdAt));
+    const priority={blocked:0,review:1,active:2,done:3,queued:4},urgency=t=>{const p=window.officeTasks.stuck(t);return p?(p.kind==='member'?0:1):2;};
+    const open=window.officeTasks.list().sort((a,b)=>urgency(a)-urgency(b)||priority[a.status]-priority[b.status]||(b.updatedAt||b.createdAt).localeCompare(a.updatedAt||a.createdAt));
     ctx.fillStyle='#fbf8f2';ctx.fillRect(0,0,W,H);
     ctx.fillStyle='#1e2230';ctx.font='700 44px Archivo, system-ui, sans-serif';ctx.textBaseline='middle';ctx.fillText('WORK BOARD',36,48);
     ctx.fillStyle='#6b6f7b';ctx.font='500 28px Archivo, system-ui, sans-serif';ctx.textAlign='right';ctx.fillText(`${open.length} tasks`,W-36,50);ctx.textAlign='left';
@@ -1688,7 +1732,8 @@
       ctx.fillStyle='#1e2230';ctx.font='500 30px Archivo, system-ui, sans-serif';
       let title=task.title;while(ctx.measureText(title).width>640&&title.length>4)title=title.slice(0,-2);if(title!==task.title)title=title.trimEnd()+'…';
       ctx.fillText(title,142,y+1);
-      const [chip,ink,label]={active:['#fdeee9','#c24a31','In progress'],blocked:['#fff1d6','#9a6212','Question'],review:['#e8f3ec','#2f6b47','Review'],done:['#e8f3ec','#2f6b47','Finished']}[task.status]||['#f0ece5','#6b6f7b','Queued'];
+      const problem=window.officeTasks.stuck(task);
+      const [chip,ink,label]=problem?(problem.kind==='member'?['#fff1d6','#9a6212','Stuck']:['#e6edf7','#2c4a73','Waiting on you']):{active:['#fdeee9','#c24a31','In progress'],blocked:['#fff1d6','#9a6212','Question'],review:['#e8f3ec','#2f6b47','Review'],done:['#e8f3ec','#2f6b47','Finished']}[task.status]||['#f0ece5','#6b6f7b','Queued'];
       ctx.fillStyle=chip;ctx.beginPath();ctx.roundRect(W-212,y-20,176,40,20);ctx.fill();
       ctx.fillStyle=ink;ctx.font='600 22px Archivo, system-ui, sans-serif';ctx.textAlign='center';ctx.fillText(label,W-124,y+1);ctx.textAlign='left';
     });
@@ -1699,8 +1744,8 @@
   function drawMonitors(){
     const tasks=window.officeTasks.list(),priority={active:0,blocked:1,review:2,queued:3,done:4};
     for(const display of monitorDisplays){const task=tasks.filter(t=>t.assignee===display.member).sort((a,b)=>priority[a.status]-priority[b.status]||(b.updatedAt||b.createdAt).localeCompare(a.updatedAt||a.createdAt))[0];
-      const state=task?{active:window.officeTasks.agentFor(display.member)?'Drafting':'In progress',blocked:'Needs decision',review:'Ready for review',queued:'Queued',done:'Finished'}[task.status]:'Idle';display.status=state;display.taskId=task?.id||null;
-      const ctx=display.canvas.getContext('2d');ctx.fillStyle='#24372d';ctx.fillRect(0,0,512,256);ctx.fillStyle='#f8f3e8';ctx.textBaseline='top';ctx.font='bold 28px Archivo, sans-serif';ctx.fillText(TEAM.find(p=>p.n===display.member)?.initials||'',24,20);ctx.font='bold 34px Archivo, sans-serif';ctx.fillText(state,24,76);ctx.font='24px Archivo, sans-serif';let title=task?.title||'Ready for a new task';while(ctx.measureText(title).width>460&&title.length>4)title=title.slice(0,-2);if(task&&title!==task.title)title+='…';ctx.fillText(title,24,138);ctx.font='20px Archivo, sans-serif';ctx.fillText(task?.by==='dry-run'?'DRY RUN · Example draft':'Click to open tasks',24,210);display.texture.needsUpdate=true;
+      const problem=task&&window.officeTasks.stuck(task),state=task?{active:window.officeTasks.agentFor(display.member)?'Drafting':'In progress',blocked:'Needs decision',review:'Ready for review',queued:'Queued',done:'Finished'}[task.status]:'Idle';display.status=state;display.stuck=problem?.short||null;display.taskId=task?.id||null;
+      const ctx=display.canvas.getContext('2d');ctx.fillStyle=problem?(problem.kind==='member'?'#6b4a12':'#2c3d5c'):'#24372d';ctx.fillRect(0,0,512,256);ctx.fillStyle='#f8f3e8';ctx.textBaseline='top';ctx.font='bold 28px Archivo, sans-serif';ctx.fillText(TEAM.find(p=>p.n===display.member)?.initials||'',24,20);ctx.font='bold 34px Archivo, sans-serif';ctx.fillText(problem?problem.short:state,24,76);ctx.font='24px Archivo, sans-serif';let title=task?.title||'Ready for a new task';while(ctx.measureText(title).width>460&&title.length>4)title=title.slice(0,-2);if(task&&title!==task.title)title+='…';ctx.fillText(title,24,138);ctx.font='20px Archivo, sans-serif';ctx.fillText(problem?.kind==='member'?'Click to see who can take over':task?.by==='dry-run'?'DRY RUN · Example draft':'Click to open tasks',24,210);display.texture.needsUpdate=true;
     }
   }
   function drawStats(){
@@ -1717,11 +1762,15 @@
       const who=[...new Set(waiting.map(t=>TEAM.find(p=>p.n===t.assignee)?.initials||t.assignee))].join(', ');
       button.textContent=`${waiting.length} ${waiting.length===1?'task needs':'tasks need'} your decision · ${who}`;
     }
+    // Stuck on the assignee: one click shows who could take over.
+    const held=list.filter(t=>window.officeTasks.stuck(t)?.kind==='member'),stuckButton=$('stuckWork');stuckButton.hidden=!held.length;
+    if(held.length){const who=[...new Set(held.map(t=>TEAM.find(p=>p.n===t.assignee)?.initials||t.assignee))].join(', ');stuckButton.textContent=`${held.length} stuck · ${who} · see who can take over`;}
   }
   $('decisions').onclick=()=>window.officeTasks.open(null,'blocked');
-  document.addEventListener('officetasks:change',()=>{drawBoard();drawStats();});
+  $('stuckWork').onclick=()=>window.officeTasks.open(null,'stuck');
+  document.addEventListener('officetasks:change',()=>{syncStuck();drawBoard();drawStats();});
   document.addEventListener('officetasks:server',drawMonitors);
-  window.officeTasks.init(TEAM,(name,state,title)=>{const a=agents.find(a=>a.n===name);if(a&&window.officeTasks.activeFor(name))setPath(a,a.desk);if(a&&SAY[state])say(a,SAY[state]);if(a&&state==='done'&&window.officeLife.preferences.celebrate){a.celebrateUntil=simTime+2.5;log(`${name} celebrates a finished task`,a.group);}if(a&&state)log(`${name} ${TASK_LOG[state]}: ${title}`,a.group);},name=>{const a=agents.find(a=>a.n===name);if(a)selectAgent(a);});
+  window.officeTasks.init(TEAM,(name,state,title)=>{const a=agents.find(a=>a.n===name);if(a&&window.officeTasks.activeFor(name))setPath(a,a.desk);if(a&&SAY[state])say(a,SAY[state]);if(a&&state==='done'&&window.officeLife.preferences.celebrate){a.celebrateUntil=simTime+2.5;log(`${name} celebrates a finished task`,a.group);}if(a&&state)log(`${name} ${TASK_LOG[state]}: ${title}`,a.group);},name=>{const a=agents.find(a=>a.n===name);if(a)selectAgent(a);},handoff);
   window.officeLife.init(TEAM,GROUPS);
   let currentMood='',lastMoodChoice='',lastMoodMinute=-1;
   const officeCat=new THREE.Group();floors[3].add(officeCat);officeCat.position.set(10,.08,P3);
@@ -1781,7 +1830,7 @@
     if(document.querySelector('dialog[open]')){for(const k in keys)keys[k]=false;}
     if(transition&&!follow)stepTransition(realDt);
     if(!drag&&cam.spin){cam.theta+=cam.spin*realDt;cam.spin*=Math.pow(.03,realDt);if(Math.abs(cam.spin)<.01)cam.spin=0;}
-    stepTour(realDt);stepRain(dt);
+    stepTour(realDt);stepRain(dt);stepHandoffs();
     const move=realDt*cam.radius*.3,fx=-Math.sin(cam.theta),fz=-Math.cos(cam.theta);
     if(keys.w){cam.target.x+=fx*move;cam.target.z+=fz*move;}if(keys.s){cam.target.x-=fx*move;cam.target.z-=fz*move;}
     if(keys.d){cam.target.x-=fz*move;cam.target.z+=fx*move;}if(keys.a){cam.target.x+=fz*move;cam.target.z-=fx*move;}
@@ -1838,7 +1887,9 @@
   renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
   setFloor(3);viewReady=true;requestAnimationFrame(frame);
   window.officeScene={
-    petCat,coffee,
+    petCat,coffee,handoff,
+    // Stuck markers and handoffs in progress, for tests.
+    workSnapshot:()=>({stuck:agents.filter(a=>a.stuck).map(a=>({name:a.n,kind:a.stuck.problem.kind,halo:a.halo.visible,label:a.label.className})),handoffs:handoffLines.map(h=>({from:h.from,to:h.to,kind:h.kind,delivered:h.delivered})),carrying:agents.filter(a=>a.rig.folder.visible).map(a=>a.n),monitors:monitorDisplays.filter(m=>m.stuck).map(m=>({member:m.member,stuck:m.stuck}))}),
     applyAppearance,startTour,stopTour,
     reviewMeeting:names=>{const members=names.map(n=>agents.find(a=>a.n===n));if(!members.length||members.length>6||new Set(names).size!==names.length||members.some(a=>!a))return false;return commandMembers(members,'meet');},
     endReview:names=>{const members=names.map(n=>agents.find(a=>a.n===n)).filter(Boolean);if(members.length)commandMembers(members,'work');},
