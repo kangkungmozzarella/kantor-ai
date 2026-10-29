@@ -1,0 +1,15 @@
+:root{--paper:#f4f1ea;--sheet:#fff;--ink:#1e2230;--ink-2:#6b6f7b;--line:#e8e3da;--accent:#e8634a;--sans:Archivo,system-ui,-apple-system,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:24px 16px;background:var(--paper);color:var(--ink);font:15px/1.5 var(--sans)}
+.auth{width:min(420px,100%);background:var(--sheet);border:1px solid var(--line);border-radius:16px;padding:28px;box-shadow:0 12px 40px rgba(30,34,48,.08)}
+.auth-brand{display:flex;align-items:center;gap:14px;margin-bottom:24px}.auth-brand strong{display:block;font-size:22px;letter-spacing:-.3px}.auth-brand div span{color:var(--ink-2);font-size:13px}
+.brand-mark{display:grid;place-items:center;width:48px;height:48px;border-radius:12px;background:var(--accent);color:#fff;flex:none}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:10px;background:var(--paper);margin-bottom:8px}
+.auth-tabs button{min-height:40px;border:0;border-radius:8px;background:transparent;color:var(--ink-2);font:600 14px var(--sans);cursor:pointer}.auth-tabs button[aria-selected=true]{background:var(--sheet);color:var(--ink);box-shadow:0 1px 3px rgba(30,34,48,.1)}
+label{display:block;margin:14px 0 6px;font-weight:600;font-size:14px}label span{font-weight:400;color:var(--ink-2)}
+input{display:block;width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;color:var(--ink);background:#fffdf8}
+button.primary{width:100%;min-height:46px;margin-top:20px;border:0;border-radius:8px;background:var(--accent);color:#fff;font:600 15px var(--sans);cursor:pointer}button.primary:hover{background:#d4553d}button:disabled{opacity:.6;cursor:default}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.auth-invite{margin:0 0 16px;padding:12px;border-radius:10px;background:#e8f3ec;color:#2f6b47;font-weight:600}
+#authFeedback:not(:empty){margin:16px 0 0;padding:10px 12px;border-radius:8px;background:#fdeee9;color:#8a3420}
+[hidden]{display:none!important}

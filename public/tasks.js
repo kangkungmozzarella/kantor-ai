@@ -63,6 +63,8 @@
     try{
       const response=await fetch(path,{method,headers:{'content-type':'application/json'},body:body&&JSON.stringify(body)});
       const data=await response.json().catch(()=>({}));
+      // The session ended (signed out elsewhere or expired): back to the sign-in page.
+      if(response.status===401){location.href='/login.html';throw new Error('Sign in to continue.');}
       if(!response.ok)throw new Error(data.error||`Server error ${response.status}`);
       return data;
     }finally{if(write){writing--;mutation++;}}
@@ -300,6 +302,7 @@
     let info;
     try {
       const response = await fetch('/api/agents', {cache: 'no-store'});
+      if (response.status === 401) { location.href = '/login.html'; return; }
       if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) return;
       info = await response.json();
     } catch { return; }

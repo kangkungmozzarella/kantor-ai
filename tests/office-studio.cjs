@@ -5,7 +5,7 @@ const port=4188,dir=fs.mkdtempSync(path.join(os.tmpdir(),'kantor-studio-'));
 const request=async(route,body,method=body?'POST':'GET')=>{const response=await fetch(`http://127.0.0.1:${port}${route}`,{method,headers:{'content-type':'application/json'},body:body&&JSON.stringify(body)});return {status:response.status,body:await response.json()};};
 const waitFor=async(check)=>{for(let i=0;i<100;i++){const value=await check();if(value)return value;await new Promise(r=>setTimeout(r,100));}throw new Error('Timed out');};
 (async()=>{
-  const server=spawn(process.execPath,[path.join(__dirname,'../server/server.js')],{env:{...process.env,PORT:String(port),DATA_DIR:dir,ENV_FILE:'/nonexistent',ANTHROPIC_API_KEY:'',DRY_RUN_DELAY_MS:'100'},stdio:['ignore','pipe','inherit']});let browser;
+  const server=spawn(process.execPath,[path.join(__dirname,'../server/server.js')],{env:{...process.env,LOCAL_MODE:'1',PORT:String(port),DATA_DIR:dir,ENV_FILE:'/nonexistent',ANTHROPIC_API_KEY:'',DRY_RUN_DELAY_MS:'100'},stdio:['ignore','pipe','inherit']});let browser;
   try{
     await new Promise((resolve,reject)=>{server.stdout.on('data',d=>String(d).includes('Kantor Kita:')&&resolve());server.on('error',reject);server.on('exit',code=>reject(new Error('Server exited '+code)));});
     const created=(await request('/api/tasks',{title:'Launch announcement',assignee:'Kak Rani',brief:'Draft in Indonesian for existing customers; use only confirmed facts.'})).body;

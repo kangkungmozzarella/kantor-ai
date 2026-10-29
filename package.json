@@ -3,7 +3,7 @@
   "private": true,
   "description": "Kantor Kita: an interactive 3D office with a small task server and optional AI agents.",
   "scripts": {
-    "start": "node server/server.js"
+    "start": "node --disable-warning=ExperimentalWarning server/server.js"
   },
   "engines": {
     "node": ">=22"

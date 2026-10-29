@@ -4,7 +4,7 @@ const {spawn}=require('node:child_process');
  const mock=http.createServer((req,res)=>{req.resume();setTimeout(()=>{res.writeHead(500,{'content-type':'application/json'});res.end(JSON.stringify({error:{message:'Delayed failure'}}));},800);});
  await new Promise(r=>mock.listen(0,'127.0.0.1',r));
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'kantor-worker-'));
- const proc=spawn(process.execPath,['server/server.js'],{env:{...process.env,PORT:'4185',DATA_DIR:dir,ENV_FILE:'/nonexistent',ANTHROPIC_API_KEY:'test-only',ANTHROPIC_DRY_RUN:'0',ANTHROPIC_BASE_URL:`http://127.0.0.1:${mock.address().port}`},stdio:['ignore','pipe','pipe']});
+ const proc=spawn(process.execPath,['server/server.js'],{env:{...process.env,LOCAL_MODE:'1',PORT:'4185',DATA_DIR:dir,ENV_FILE:'/nonexistent',ANTHROPIC_API_KEY:'test-only',ANTHROPIC_DRY_RUN:'0',ANTHROPIC_BASE_URL:`http://127.0.0.1:${mock.address().port}`},stdio:['ignore','pipe','pipe']});
  try{
  await new Promise((resolve,reject)=>{proc.stdout.on('data',d=>{if(String(d).includes('Kantor Kita:'))resolve();});proc.on('error',reject);proc.on('exit',()=>reject(new Error('server exited')));});
  const call=async(method,url,data)=>{const r=await fetch('http://127.0.0.1:4185/api'+url,{method,headers:{'content-type':'application/json'},body:data&&JSON.stringify(data)});return {status:r.status,data:await r.json()};};

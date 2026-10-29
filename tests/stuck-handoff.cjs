@@ -14,7 +14,7 @@ const seed=[
 ];
 fs.writeFileSync(path.join(dir,'tasks.json'),JSON.stringify(seed));
 (async()=>{
-  const server=spawn(process.execPath,[path.join(__dirname,'../server/server.js')],{env:{...process.env,PORT:String(port),DATA_DIR:dir,ENV_FILE:'/nonexistent',ANTHROPIC_API_KEY:'',DRY_RUN_DELAY_MS:'100'},stdio:['ignore','pipe','inherit']});let browser;
+  const server=spawn(process.execPath,[path.join(__dirname,'../server/server.js')],{env:{...process.env,LOCAL_MODE:'1',PORT:String(port),DATA_DIR:dir,ENV_FILE:'/nonexistent',ANTHROPIC_API_KEY:'',DRY_RUN_DELAY_MS:'100'},stdio:['ignore','pipe','inherit']});let browser;
   try{
     await new Promise((resolve,reject)=>{server.stdout.on('data',d=>String(d).includes('Kantor Kita:')&&resolve());server.on('error',reject);server.on('exit',code=>reject(new Error('Server exited '+code)));});
     // Agent handoff suggestion: the dry-run customer service draft names the social media agent, and the line is stripped from the draft.

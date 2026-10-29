@@ -24,6 +24,7 @@
       <button id="bLog" class="btn" aria-controls="log" aria-expanded="true">Log</button>
       <button id="bTasks" class="btn primary">Tasks <span id="taskCount">0</span></button>
       <button id="bLife" class="btn">Office life</button>
+      <button id="bAccount" class="btn" hidden>Account</button>
     </div>
   </header>
   <nav id="floors" aria-label="Choose a floor">
@@ -86,11 +87,19 @@
   </dialog>
   <dialog id="workBoardDialog" class="studio-dialog" aria-labelledby="workBoardHeading"><header class="task-header"><div><h1 id="workBoardHeading">Work board</h1><p>Real tasks, latest drafts and results from the office.</p></div><button id="closeWorkBoard" type="button">Close</button></header><label for="workBoardFilter">Show</label><select id="workBoardFilter"><option value="all">All work</option><option value="review">Ready for review</option><option value="blocked">Needs decision</option><option value="active">In progress</option><option value="done">Finished</option><option value="stuck">Stuck or waiting</option></select><div id="workBoardItems"></div></dialog>
   <dialog id="reviewDialog" class="studio-dialog" aria-labelledby="reviewHeading"><header class="task-header"><div><h1 id="reviewHeading">Review meeting</h1><p>Discuss an existing draft. Approval stays in Tasks.</p></div><button id="closeReview" type="button">Close</button></header><form id="reviewMeetingForm"><label for="reviewTask">Draft to discuss</label><select id="reviewTask" required></select><pre id="reviewSource"></pre><fieldset id="reviewPeople"><legend>Invite people · up to 6 meeting seats</legend></fieldset><label for="reviewFocus">What should they check?</label><textarea id="reviewFocus" rows="3" maxlength="2000" placeholder="For example: clarity, missing facts and customer questions"></textarea><label class="studio-check"><input id="reviewUseAI" type="checkbox"> Ask connected agents for feedback</label><p id="reviewAvailability"></p><button type="submit">Start review meeting</button><button id="endReview" type="button">Send invitees back to work</button></form><p id="reviewFeedback" role="status"></p><pre id="reviewNotes" tabindex="0"></pre><button id="downloadReview" type="button" hidden>Download review notes</button></dialog>
+  <dialog id="accountDialog" class="studio-dialog" aria-labelledby="accountHeading"><header class="task-header"><div><h1 id="accountHeading">Workspace</h1><p id="accountWho"></p></div><button id="closeAccount" type="button">Close</button></header>
+    <section><h2>AI usage today</h2><p id="accountUsage"></p></section>
+    <section id="accountPeople"><h2>People with access</h2><ul id="accountMembers" class="account-members"></ul>
+      <div id="accountInvite" hidden><button id="createInvite" type="button">Create invite link</button><p class="account-hint">Each link works once, for 7 days. Anyone with the link can join this workspace.</p><label for="inviteLink">Invite link</label><input id="inviteLink" readonly hidden><button id="copyInvite" type="button" hidden>Copy link</button></div></section>
+    <p id="accountFeedback" role="status"></p>
+    <button id="signOut" type="button" hidden>Sign out</button>
+  </dialog>
   <div id="tourBar" class="panel" hidden><span id="tourLabel"></span><button id="stopTour" class="btn" type="button">Stop tour</button></div>
   <script src="tasks.js"></script>
   <script src="life.js"></script>
   <script src="studio.js"></script>
   <script src="music.js"></script>
+  <script src="account.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="office.js"></script>
 </body>

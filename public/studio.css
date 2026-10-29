@@ -19,3 +19,7 @@
 .studio-dialog pre{scrollbar-gutter:stable}
 #tourBar{position:fixed;left:50%;transform:translateX(-50%);top:110px;padding:8px 12px;display:flex;align-items:center;gap:16px;z-index:8;background:#f7f3eb;color:#2a2622}#tourBar[hidden]{display:none}
 @media(max-width:700px){.studio-options{grid-template-columns:1fr;gap:24px}.studio-dialog{padding:20px 16px}.life-layout>section:nth-child(3),.life-layout>section:nth-child(4){grid-column:auto}#reviewPeople{grid-template-columns:1fr}#tourBar{top:auto;bottom:150px;max-width:calc(100% - 24px);width:max-content}}
+#accountDialog{width:min(560px,calc(100% - 24px))}#accountDialog section{padding:16px 0;border-bottom:1px solid #d7cec0}
+.account-members{list-style:none;margin:0;padding:0}.account-members li{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #e6dfd2;overflow-wrap:anywhere}.account-members li span{color:#6b6459}
+.account-hint{color:#6b6459;font-size:13px}#accountDialog input{box-sizing:border-box;width:100%;min-height:44px;padding:10px;background:#fffdf8;border:1px solid #827c71;border-radius:5px;font:inherit}
+#accountFeedback{color:#385747}#signOut{background:#fff;color:#2a2622}

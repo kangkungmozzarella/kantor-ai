@@ -57,20 +57,20 @@ Tugas dengan nama karakter prototipe lama tetap disimpan dan dapat dipindahkan k
 
 ## Server tugas dan agen AI
 
-Dengan server, tugas disimpan di `data/tasks.json` dan anggota yang tersambung ke agen AI mengerjakan tugasnya sendiri. Saat ini **Social Media Specialist** dan **Customer Service**; daftarnya ada di `server/agents.js`. Anggota lain tetap simulasi dengan status yang diubah manual.
+Dengan server, tugas disimpan di `data/kantor.db` (SQLite, per workspace) dan anggota yang tersambung ke agen AI mengerjakan tugasnya sendiri. Saat ini **Social Media Specialist** dan **Customer Service**; daftarnya ada di `server/agents.js`. Anggota lain tetap simulasi dengan status yang diubah manual.
 
 ```sh
 cp .env.example .env   # isi ANTHROPIC_API_KEY dari console.anthropic.com → API Keys
 npm start              # atau: node server/server.js  (Node 22+)
 ```
 
-Buka http://127.0.0.1:3000.
+Buka http://127.0.0.1:3000. Server sekarang memakai akun (lihat **Akun dan workspace** di bawah); tambahkan `LOCAL_MODE=1` di `.env` untuk cara lama tanpa login.
 
 - Tugas untuk anggota yang tersambung ke agen AI berjalan sendiri: **Queued → In progress → Needs review**. Baca hasil lalu pilih **Approve & finish**, atau isi **Revision comments** dan klik **Request revision**. Revisi kembali ke antrean; draf sebelumnya tersimpan di **Draft history**. Agen tidak memposting apa pun.
 - Tanpa `ANTHROPIC_API_KEY`, server berjalan dalam **dry run**: hasilnya teks contoh berlabel jelas, bukan output AI. Label nama anggota yang tersambung ke agen AI memiliki titik hijau dan panel detailnya menampilkan mode yang dipakai.
 - Jika Claude gagal (koneksi, key salah, saldo habis), tugas kembali ke antrean dengan pesan error dan tombol **Try again**.
 - Pada kunjungan pertama ke server yang masih kosong, tugas yang tersimpan di browser dipindahkan ke server.
-- Server belum memiliki login, sehingga hanya mendengarkan di 127.0.0.1 (laptop ini). Jangan dibuka ke jaringan sebelum ada autentikasi.
+- Server mendengarkan di 127.0.0.1 secara bawaan. Ubah `HOST` hanya dengan akun aktif (tanpa `LOCAL_MODE`).
 - `.env` dan `data/` tidak masuk git.
 - Tanpa server (misalnya `python3 -m http.server` atau Live Server), aplikasi tetap berjalan seperti sebelumnya dengan localStorage.
 
@@ -170,3 +170,19 @@ Filter **Stuck or waiting** tersedia di Tasks dan Work board. Office log menampi
 Saat serah-terima atau ambil alih, pemberi berjalan ke meja penerima sambil membawa map, dengan garis lengkung putus-putus di antara kedua meja. Bubble menampilkan "For you!" / "Over to you!" dan penerima menjawab "Got it!". Kejadiannya tercatat di Office log. Animasinya simulasi; tugasnya sendiri sudah dipindahkan saat tombol diklik.
 
 `tests/stuck-handoff.cjs` mengisi server dry-run dengan tugas lama untuk memeriksa penanda mandek (lingkaran, label, monitor, tombol log), filter dan batas waktu, urutan saran ambil alih, pemindahan dari error agen, saran handoff dari agen, penjaga API (draf belum disetujui, diri sendiri, versi lama), form handoff, animasi map dan layout 375/768px.
+
+## Akun dan workspace (tahap 1 menuju SaaS)
+
+Server menyimpan data di `data/kantor.db` memakai SQLite bawaan Node 22 (`node:sqlite`), tanpa paket tambahan. Isinya akun, workspace, anggota, sesi, undangan, tugas per workspace, dan pemakaian AI harian.
+
+- **Masuk dan daftar** di `/login.html`. Membuka kantor tanpa sesi akan diarahkan ke halaman itu, dan API membalas 401. Password di-hash dengan scrypt. Sesi berupa cookie `HttpOnly`, `SameSite=Lax`, berlaku 30 hari, dan `Secure` bila `PUBLIC_URL` memakai https. Token sesi dan undangan hanya disimpan sebagai hash.
+- **Workspace**: pendaftar pertama membuat workspace dan menjadi `owner`. Setelah itu pendaftaran hanya lewat link undangan, kecuali `OPEN_SIGNUP=1`, supaya orang asing tidak memakai kuota Claude server. Tugas tunggal dari versi lama (`data/tasks.json`) dipindahkan ke workspace pertama, lalu filenya diganti nama menjadi `tasks.json.imported`.
+- **Undangan**: pemilik membuat link di panel **Account** (tombol bernama workspace di header). Link hanya bisa dipakai sekali dan berlaku 7 hari. Orang yang sudah punya akun cukup masuk lewat link itu untuk bergabung.
+- **Pemisahan**: tugas, worker agen, review dan coffee break berjalan per workspace. Workspace lain tidak bisa membaca atau mengubah tugas yang bukan miliknya.
+- **Kuota AI**: tiap workspace mendapat `AI_DAILY_LIMIT` permintaan Claude per hari UTC (bawaan 200). Dry run tidak dihitung. Bila habis, tugas agen kembali ke antrean dengan pesan yang jelas, dan review atau coffee break membalas 429. Panel **Account** menampilkan pemakaian hari ini.
+- **Keamanan permintaan**: semua penulisan harus berupa JSON dari situs yang sama (header `Origin` dicek), sehingga form atau skrip dari situs lain tidak bisa memakai sesi. Percobaan masuk atau daftar dibatasi 10 per email dan 50 per alamat jaringan setiap 15 menit. Di belakang reverse proxy, set `TRUST_PROXY=1` supaya alamat asli dan https terbaca.
+- **`LOCAL_MODE=1`**: tanpa login, satu workspace di laptop ini, seperti sebelumnya. Mode ini menolak berjalan bila `HOST` bukan alamat lokal. Tes yang menyalakan server memakai mode ini.
+
+Belum termasuk (tahap berikutnya): tim dan agen yang bisa diatur per workspace (sekarang semua workspace memakai 13 karakter dan dua agen bawaan), reset password lewat email, menghapus anggota dari UI, billing, dan deploy. Server menyimpan tugas per workspace di memori proses, jadi jalankan satu proses saja.
+
+`tests/accounts.cjs` memakai provider Claude tiruan untuk memeriksa daftar/masuk/keluar, cookie sesi, penjaga lintas situs, undangan sekali pakai, peran owner/member, pemisahan workspace, batas percobaan, kuota AI per workspace, pendaftaran khusus undangan, impor tugas lama, serta alur masuk dan panel Account di browser.
