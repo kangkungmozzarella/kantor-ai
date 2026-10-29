@@ -809,6 +809,48 @@
   })();
 
   const SKIN=0xe5ba91,HAIR=0x2f2925,TROUSERS=0x38414c,SHOES=0x2a2622,FIGURE_SCALE=1;
+  // Figures get their own skin and hair finish: a warm glow on the skin, a soft sheen on the hair.
+  const skinMaterial=new THREE.MeshStandardMaterial({color:linear(0xf0c4a0),roughness:.62,emissive:linear(0x5a2a14),emissiveIntensity:.12});
+  const hairMaterial=new THREE.MeshStandardMaterial({color:linear(0x3a2a22),roughness:.42,metalness:.05});
+  // Painted faces, drawn once per look and pose: iris colour, lashes, eyes open or blinking, mouth closed or talking.
+  // The canvas wraps the front of the head; its x follows the angle around the head and its y the angle down it.
+  const FACE={phiLength:1.6,thetaStart:.85,thetaLength:1.5},faceTextures=new Map();
+  const IRIS=[['#2b1a14','#8a5a3c'],['#24160f','#6e4630'],['#2a1c18','#9a6a48']];
+  function faceTexture(gender,shade,blink,talk){
+    const key=[gender,shade,blink,talk].join('/');if(faceTextures.has(key))return faceTextures.get(key);
+    const c=document.createElement('canvas');c.width=c.height=512;const ctx=c.getContext('2d');
+    for(const side of [-1,1]){
+      const x=256+side*108,y=282;
+      // Blushing cheeks under each eye.
+      const blush=ctx.createRadialGradient(x+side*30,y+88,4,x+side*30,y+88,42);blush.addColorStop(0,'rgba(240,128,118,.55)');blush.addColorStop(1,'rgba(240,128,118,0)');ctx.fillStyle=blush;ctx.fillRect(x-80,y+20,160,120);
+      // Soft rounded brows.
+      ctx.strokeStyle='rgba(58,40,32,.9)';ctx.lineWidth=9;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x-side*32,y-100);ctx.quadraticCurveTo(x+side*4,y-114,x+side*40,y-102);ctx.stroke();
+      ctx.lineCap='round';ctx.strokeStyle='#2a1d18';
+      if(blink){ctx.lineWidth=10;ctx.beginPath();ctx.moveTo(x-52,y+4);ctx.quadraticCurveTo(x,y+32,x+52,y+4);ctx.stroke();continue;}
+      // Big glossy eyes: a dark-to-warm iris, a pupil, two highlights and a lash line on top.
+      const iris=ctx.createLinearGradient(0,y-50,0,y+50);iris.addColorStop(0,IRIS[shade][0]);iris.addColorStop(.55,IRIS[shade][0]);iris.addColorStop(1,IRIS[shade][1]);
+      ctx.fillStyle=iris;ctx.beginPath();ctx.ellipse(x,y,52,68,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='rgba(15,8,6,.85)';ctx.beginPath();ctx.ellipse(x,y+8,25,34,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(x-side*14-8,y-28,19,24,-.3,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(x+side*16+6,y+36,9,0,Math.PI*2);ctx.fill();
+      ctx.lineWidth=11;ctx.beginPath();ctx.ellipse(x,y+2,56,70,0,Math.PI*1.08,Math.PI*1.92);ctx.stroke();
+      // Lashes flick out at the outer corner; longer and doubled for the long-haired figures.
+      const outer=x+side*54,lashes=gender==='female'?[[16,-14],[22,-2]]:[[12,-10]];ctx.lineWidth=gender==='female'?7:6;
+      for(const [dx,dy] of lashes){ctx.beginPath();ctx.moveTo(outer-side*4,y-30);ctx.lineTo(outer+side*dx,y-30+dy);ctx.stroke();}
+    }
+    // A small nose and a smile; talking opens the mouth.
+    ctx.fillStyle='rgba(196,120,96,.55)';ctx.beginPath();ctx.ellipse(256,348,7,5,0,0,Math.PI*2);ctx.fill();
+    if(talk){ctx.fillStyle='#8a3c34';ctx.beginPath();ctx.ellipse(256,386,17,13,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#e8867a';ctx.beginPath();ctx.ellipse(256,393,10,5,0,0,Math.PI*2);ctx.fill();}
+    else{ctx.strokeStyle='#a0524a';ctx.lineWidth=6;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(240,380);ctx.quadraticCurveTo(256,394,272,380);ctx.stroke();}
+    const texture=new THREE.CanvasTexture(c);texture.encoding=THREE.sRGBEncoding;texture.anisotropy=4;faceTextures.set(key,texture);return texture;
+  }
+  const faceGeometry=new THREE.SphereGeometry(1,40,28,Math.PI/2-FACE.phiLength/2,FACE.phiLength,FACE.thetaStart,FACE.thetaLength);
+  function setFace(rig,blink,talk){
+    const face=rig.face;if(!face||(face.blink===blink&&face.talk===talk))return;
+    face.blink=blink;face.talk=talk;face.mesh.material.map=faceTexture(face.gender,face.shade,blink,talk);face.mesh.material.needsUpdate=true;
+  }
+  // A blink of about a tenth of a second every few seconds, out of step between people.
+  const blinking=(seed)=>(simTime*1+seed*1.37)%4.3<.12;
   const part=(geometry,color,x,y,z,parent)=>mesh(geometry,color,x,y,z,parent,false);
 
   function softBox(w,h,d){
@@ -838,47 +880,58 @@
     const figure=new THREE.Group();figure.scale.setScalar(FIGURE_SCALE);
     const body=new THREE.Group();figure.add(body);
     const hips=new THREE.Group();hips.position.y=.88;body.add(hips);
+    // Chibi proportions: a big round head, a short rounded jacket over a light top, and white sneakers.
+    // Joint positions match the previous figure, so every pose, seat and stair height still fits.
     part(softBox(.55,.17,.35),TROUSERS,0,.015,0,hips);
-    oval(.64,.7,.43,shirt,0,.38,0,hips);
-    part(softBox(.13,.14,.13),SKIN,0,.75,0,hips);
-    const head=new THREE.Group();head.position.y=1.02;hips.add(head);
-    oval(.68,.7,.61,SKIN,0,.03,0,head);
-    oval(.72,.38,.65,HAIR,0,.25,-.055,head);
-    for(let i=0;i<5;i++){
-      const lock=oval(.23,.27,.23,HAIR,-.27+i*.13,.27+Math.sin(i)*.035,.18,head);lock.rotation.z=-.3+i*.1;
+    oval(.66,.68,.48,shirt,0,.37,0,hips);
+    oval(.26,.42,.1,0xf4efe6,0,.44,.2,hips);
+    for(const side of [-1,1]){const lapel=part(softBox(.1,.34,.05),mix(shirt,0x000000,.18),side*.12,.5,.215,hips);lapel.rotation.z=side*.32;}
+    part(softBox(.15,.12,.15),SKIN,0,.74,0,hips);
+    const head=new THREE.Group();head.position.y=1.08;hips.add(head);
+    oval(.96,.9,.84,SKIN,0,.12,0,head);
+    for(const side of [-1,1])oval(.13,.2,.13,SKIN,side*.47,.08,0,head);
+    // The painted face sits a hair above the head surface.
+    const shade=index%IRIS.length,faceMesh=new THREE.Mesh(faceGeometry,new THREE.MeshStandardMaterial({map:faceTexture(gender,shade,false,false),transparent:true,depthWrite:false,roughness:.62,polygonOffset:true,polygonOffsetFactor:-2}));
+    faceMesh.scale.set(.486,.456,.426);faceMesh.position.y=.12;faceMesh.renderOrder=1;head.add(faceMesh);
+    // Hair: a full cap, a fringe of soft locks, then a long or short back by figure.
+    oval(1.02,.62,.92,HAIR,0,.34,-.04,head);
+    // A fringe of slim locks along an arch, each tipped toward its side of the face.
+    for(let i=0;i<9;i++){
+      const u=i/8*2-1,lock=oval(.17,.28,.13,HAIR,u*.38,.38-Math.abs(u)*.1+Math.sin(i*2.1)*.02,.33-Math.abs(u)*.08,head);lock.rotation.set(.35,-u*.5,-u*.55);
     }
-    for(const side of [-1,1]){
-      oval(.12,.19,.13,SKIN,side*.33,0,0,head);
-      oval(.058,.088,.03,HAIR,side*.13,.025,.293,head);
-      oval(.016,.023,.012,0xffffff,side*.13-.01,.043,.31,head);
-      oval(.1,.04,.016,0xd59a80,side*.19,-.09,.275,head);
-    }
-    oval(.085,.065,.08,SKIN,0,-.04,.3,head);
-    oval(.09,.026,.02,0x895d4c,0,-.15,.286,head);
     if(gender==='female'){
-      oval(.65,.68,.27,HAIR,0,-.13,-.25,head);
-      for(const side of [-1,1])oval(.18,.55,.28,HAIR,side*.29,-.12,-.06,head);
-      if(index%2===0)oval(.32,.33,.32,HAIR,.19,.4,-.23,head);
+      // Long hair: a smooth back panel, tapered side curtains and a few strands for texture.
+      oval(.98,1.08,.42,HAIR,0,-.08,-.26,head);
+      for(const side of [-1,1]){
+        const curtain=oval(.2,.86,.3,HAIR,side*.45,-.16,-.03,head);curtain.rotation.z=side*.06;
+        for(let k=0;k<2;k++){const strand=oval(.1,.62,.12,HAIR,side*(.3+k*.13),-.3,-.36,head);strand.rotation.z=side*(.08+k*.05);}
+      }
+      if(index%2===0)oval(.38,.38,.38,HAIR,.24,.58,-.26,head);
     }else{
-      oval(.62,.35,.22,HAIR,0,.11,-.27,head);
-      oval(.35,.23,.35,HAIR,.14,.39,-.03,head);
+      // Short, messy and full on top: tufts tilted different ways across the crown.
+      oval(.9,.55,.34,HAIR,0,.13,-.3,head);
+      for(const side of [-1,1])oval(.14,.3,.3,HAIR,side*.45,.25,-.05,head);
+      for(let i=0;i<7;i++){const a=i/7*Math.PI*2+index,tuft=oval(.3,.2,.3,HAIR,Math.cos(a)*.26,.6+Math.sin(i*2.3)*.03,Math.sin(a)*.22-.04,head);tuft.rotation.set(Math.sin(a)*.5,a,-Math.cos(a)*.5);}
     }
     const legs=[-1,1].map(sx=>{
       const thigh=joint(hips,sx*.155,-.03,0,.38,.25,TROUSERS);
       const knee=joint(thigh,0,-.38,0,.39,.24,TROUSERS);
-      part(softBox(.27,.12,.38),SHOES,0,-.41,.055,knee);
+      part(softBox(.29,.13,.4),0xf3f0ea,0,-.4,.06,knee);
+      part(softBox(.3,.05,.41),0xc9bfae,0,-.46,.06,knee);
       return {thigh,knee};
     });
     const arms=[-1,1].map(sx=>{
-      const shoulder=joint(hips,sx*.425,.65,0,.33,.23,shirt);
-      const elbow=joint(shoulder,0,-.33,0,.29,.2,SKIN);
+      const shoulder=joint(hips,sx*.425,.65,0,.33,.24,shirt);
+      oval(.3,.28,.3,shirt,0,-.04,0,shoulder);
+      const elbow=joint(shoulder,0,-.33,0,.27,.22,shirt);
       oval(.23,.22,.23,SKIN,0,-.31,0,elbow);
       return {shoulder,elbow};
     });
     const cup=part(new THREE.CylinderGeometry(.08,.07,.17,10),CARD,0,-.36,.13,arms[1].elbow);
     const phone=part(softBox(.045,.25,.14),SHOES,-.1,-.34,0,arms[1].elbow);
     cup.visible=phone.visible=false;
-    return {figure,body,hips,head,legs,arms,cup,phone};
+    figure.traverse(o=>{if(!o.isMesh)return;if(o.material===material(SKIN))o.material=skinMaterial;else if(o.material===material(HAIR))o.material=hairMaterial;});
+    return {figure,body,hips,head,legs,arms,cup,phone,face:{mesh:faceMesh,gender,shade,blink:false,talk:false}};
   }
   function character(person,index) {
     const g=new THREE.Group(),rig=buildFigure(GROUPS[person.group].color,person.gender,index);g.add(rig.figure);
@@ -1031,7 +1084,7 @@
     else if(person.pose==='till'){const k=Math.sin(t*9)*.08;arm=[[-.85+k,.1,-.6],[-.85-k,.1,-.6]];lean=.08;}
     else if(person.pose==='pay'){arm[1]=[-1.2,.08,-.35];}
     blendPose(person.rig,leg,arm,bodyY,bodyZ,lean,dt,person.pose==='walk'?Math.sin(t*8)*.035:Math.sin(t*1.4)*.008);
-    phone.visible=person.pose==='phone';
+    phone.visible=person.pose==='phone';setFace(person.rig,blinking(person.g.id),false);
     person.g.rotation.y+=wrap(person.heading-person.g.rotation.y)*Math.min(1,dt*8);
   }
   function stepShop(dt){
@@ -1251,6 +1304,7 @@
     if(state==='water')arm[1]=[-1.1,.18,-.3];
     if(agent.carrying&&state!=='stairs')arm[1]=[-.6,.12,-1.3];
     if(agent.celebrateUntil>simTime&&!walking&&state!=='stairs'&&!matchMedia('(prefers-reduced-motion: reduce)').matches&&window.officeLife.preferences.celebrate){arm=[[-2.4,.35,-.5],[-2.4,.35,-.5]];bodyY+=Math.abs(Math.sin(t*8))*.06;}
+    setFace(agent.rig,blinking(i),talking&&Math.sin(t*13+i)>-.2);
     const sway=walking?Math.sin(t*7.2+i*1.7)*.035:Math.sin(t*1.2+i)*.008;
     blendPose(agent.rig,leg,arm,bodyY+(walking?0:Math.sin(t*1.5+i)*.008),bodyZ,lean,dt,sway);
     cup.visible=state==='drink'||(!walking&&agent.spot?.roofPose==='coffee');phone.visible=state==='call';agent.rig.wateringCan.visible=state==='water';
@@ -1346,7 +1400,7 @@
     if(agent.stuck){const k=reduceMotion?0:(Math.sin(simTime*3+agent.index)+1)/2;agent.halo.scale.setScalar(1+k*.18);agent.halo.material.opacity=.9-k*.35;}
     const turn=wrap(agent.heading-agent.g.rotation.y);agent.g.rotation.y+=turn*Math.min(1,dt*(Math.abs(turn)>1.3?14:8));
     pose(agent,state,walking,sitting,talking,partner,dt);
-    agent.bubble.visible=talking;agent.bubble.position.set(0,sitting?2.05:2.55,0);
+    agent.bubble.visible=talking;agent.bubble.position.set(0,sitting?2.3:2.8,0);
     agent.g.visible=visibleAgent(agent);
   }
   function moveTeam(level) {
@@ -1850,7 +1904,7 @@
     scene.updateMatrixWorld(true);
     const occupied=[];
     for(const a of [...agents].sort((a,b)=>Number(b===selected)-Number(a===selected))){
-      a.g.getWorldPosition(world);projected.copy(world);projected.y+=2.65;projected.project(camera);
+      a.g.getWorldPosition(world);projected.copy(world);projected.y+=2.85;projected.project(camera);
       const x=(projected.x*.5+.5)*innerWidth,y=(-projected.y*.5+.5)*innerHeight;
       const width=a.initials.length*7+24;
       let labelY=y;
