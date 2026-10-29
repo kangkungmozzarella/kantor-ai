@@ -1,6 +1,6 @@
 // Kantor Kita server: serves public/ and the task API. People sign in to a workspace (server/accounts.js);
 // each workspace has its own tasks in SQLite (server/store.js). Tasks assigned to a connected team member
-// (server/agents.js) are worked by Claude, or by a labelled dry run when no API key is set.
+// (set per workspace, server/team.js) are worked by Claude, or by a labelled dry run when no API key is set.
 // LOCAL_MODE=1 skips accounts and keeps one workspace on this machine, as before.
 const http = require('node:http');
 const fs = require('node:fs');
@@ -10,7 +10,7 @@ const crypto = require('node:crypto');
 const ROOT = path.resolve(__dirname, '..');
 try { process.loadEnvFile(process.env.ENV_FILE || path.join(ROOT, '.env')); } catch { /* no .env file: dry run */ }
 
-const agents = require('./agents');
+const team = require('./team');
 const PUBLIC = path.join(ROOT, 'public');
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(ROOT, 'data'));
 const LEGACY_TASKS = path.join(DATA_DIR, 'tasks.json');
@@ -50,17 +50,14 @@ function spend(workspaceId) {
   if (usage(workspaceId).today >= AI_DAILY_LIMIT) throw Object.assign(new Error(`This workspace reached its daily limit of ${AI_DAILY_LIMIT} AI requests. It resets at 00:00 UTC.`), {status: 429});
   store.q('insert into usage (workspace_id, day, requests) values (?, ?, 1) on conflict (workspace_id, day) do update set requests = requests + 1').run(workspaceId, day());
 }
-// Same names and roles as TEAM in public/office.js.
-const ROLES = {'Koh Arman':'CEO','Koh Wira':'CTO','Kak Rani':'Social Media Specialist','Kak Dewi':'Digital Marketing','Mira':'Business Development','Tari':'Social Media Intern','Bagas Pratama Putra':'Frontend Engineer','Rizky Hakim':'Backend Engineer','Yoga':'Product Design','Bang Eko':'Graphic Designer','Gilang':'Customer Service Leader','Kak Sinta':'Customer Service','Kak Laras':'Customer Service'};
-const MEMBERS = new Set(Object.keys(ROLES));
 const text = (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 // Agents may suggest who continues from their draft. A person approves the handoff; nothing moves on its own.
-const withHandoff = (agent, self) => ({...agent, system: `${agent.system}\nIf a teammate should continue from your draft, end with one line: HANDOFF: <exact name> | <short task title for them>. Only suggest someone from this list, never yourself, and only when the next step clearly belongs to them:\n${Object.entries(ROLES).filter(([n]) => n !== self).map(([n, r]) => `- ${n} (${r})`).join('\n')}`});
-function splitHandoff(answer, self) {
+const withHandoff = (agent, self, people) => ({...agent, system: `${agent.system}\nIf a teammate should continue from your draft, end with one line: HANDOFF: <exact name> | <short task title for them>. Only suggest someone from this list, never yourself, and only when the next step clearly belongs to them:\n${people.filter(p => p.name !== self).map(p => `- ${p.name} (${p.role})`).join('\n')}`});
+function splitHandoff(answer, self, people) {
   const match = answer.match(/\n?HANDOFF:\s*([^|\n]+?)\s*\|\s*([^\n]+)\s*$/);
   if (!match) return {answer, handoff: null};
   const assignee = match[1].trim(), title = text(match[2], 160), rest = answer.slice(0, match.index).trim();
-  return {answer: rest || answer, handoff: MEMBERS.has(assignee) && assignee !== self && title ? {assignee, title} : null};
+  return {answer: rest || answer, handoff: people.some(p => p.name === assignee) && assignee !== self && title ? {assignee, title} : null};
 }
 
 // ---- agent worker: one task at a time per connected member and workspace, oldest first ----
@@ -81,18 +78,18 @@ async function askClaude(agent, task, workspaceId) {
     return answer;
   } finally { clearTimeout(timer); }
 }
-async function dryRun(agent, task) {
+async function dryRun(agent, task, agents = {}) {
   await new Promise(resolve => setTimeout(resolve, Number(process.env.DRY_RUN_DELAY_MS ?? 4000)));
   // Dry runs ask back when the brief is nearly empty, so the "Needs decision" flow can be tried without a key.
   if ((task.brief || '').trim().length < 12) return 'QUESTIONS:\n1. DRY RUN: who is this for, and what should it say?\n2. DRY RUN: any facts, links or deadlines to include?';
   // Customer service drafts suggest a follow-up for social media, so the handoff flow can be tried without a key.
-  const next = agent.role === 'Customer Service' && Object.keys(agents).find(n => agents[n].role === 'Social Media Specialist');
+  const next = agent.preset === 'service' && Object.keys(agents).find(n => agents[n].preset === 'social');
   return `DRY RUN: no ANTHROPIC_API_KEY is set, so this is placeholder text, not AI output.\n\n${agent.role} would draft: "${task.title}".\nBrief received: ${task.brief || '(none)'}${task.feedback ? `\nRevision requested: ${task.feedback}` : ''}${next ? `\nHANDOFF: ${next} | DRY RUN: social post answering this customer question` : ''}`;
 }
-const ask = (space, agent, task) => DRY_RUN ? dryRun(agent, task) : askClaude(agent, task, space.id);
+const ask = (space, agent, task) => DRY_RUN ? dryRun(agent, task, space.agents) : askClaude(agent, task, space.id);
 async function work(space, name) {
-  const {tasks, busy} = space, save = space.save;
-  if (busy.has(name)) return;
+  const {tasks, busy} = space, save = space.save, agent = space.agents[name];
+  if (busy.has(name) || !agent) return;
   const task = tasks.filter(t => t.assignee === name && t.status === 'queued' && !t.error).sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
   if (!task || tasks.some(t => t.assignee === name && t.status === 'active')) return;
   busy.add(name);
@@ -100,14 +97,14 @@ async function work(space, name) {
   try {
     Object.assign(task, {status: 'active', runId, version:(task.version||0)+1, updatedAt: now()}); save();
     const input=structuredClone(task);
-    const raw = DRY_RUN ? await dryRun(agents[name], input) : await askClaude(withHandoff(agents[name], name), input, space.id);
+    const raw = DRY_RUN ? await dryRun(agent, input, space.agents) : await askClaude(withHandoff(agent, name, space.team), input, space.id);
     const current = tasks.find(t => t.id === task.id);
     // The task may have been moved back to the queue or reassigned while the agent worked.
     if (current && current.status === 'active' && current.assignee === name && current.runId === runId) {
-      const by=DRY_RUN?'dry-run':modelOf(agents[name]),asked=raw.match(/^QUESTIONS:\s*([\s\S]+)/);
+      const by=DRY_RUN?'dry-run':modelOf(agent),asked=raw.match(/^QUESTIONS:\s*([\s\S]+)/);
       // The agent asked instead of guessing: park the task until someone answers.
       if(asked){Object.assign(current,{status:'blocked',questions:asked[1].trim().slice(0,2000),askedBy:by,runId:null,version:(current.version||0)+1,updatedAt:now()});save();return;}
-      const {answer,handoff}=splitHandoff(raw,name);
+      const {answer,handoff}=splitHandoff(raw,name,space.team);
       const draft={result:answer.slice(0,10000),by,createdAt:now(),feedback:input.feedback||''};
       Object.assign(current, {status:'review',result:draft.result,by:draft.by,handoff:handoff||undefined,history:[...(current.history||[]),draft],runId:null,version:(current.version||0)+1,updatedAt:now()});save();
     }
@@ -117,7 +114,7 @@ async function work(space, name) {
     console.error(`Agent ${name} failed on "${task.title}": ${error.message}`);
   } finally { busy.delete(name); setImmediate(() => work(space, name)); }
 }
-const kickSpace = space => Object.keys(agents).forEach(name => work(space, name));
+const kickSpace = space => Object.keys(space.agents).forEach(name => work(space, name));
 
 // ---- HTTP ----
 function send(res, status, body) {
@@ -138,8 +135,22 @@ function newTask(input) {
   const status = STATES.has(input.status) ? input.status : 'queued', result = text(input.result, 10000);
   return {id: crypto.randomUUID(), title, assignee, brief: text(input.brief, 5000), status: ['done','review'].includes(status) && !result ? 'queued' : status, result, createdAt: now()};
 }
-async function api(req, res, url, space) {
-  const {tasks} = space, save = space.save, kick = () => kickSpace(space);
+async function api(req, res, url, space, role) {
+  const {tasks, agents} = space, save = space.save, kick = () => kickSpace(space);
+  const MEMBERS = new Set(space.team.map(p => p.name)), ROLES = Object.fromEntries(space.team.map(p => [p.name, p.role]));
+  if (url.pathname === '/api/team' && req.method === 'GET')
+    return send(res, 200, {team: space.team, divisions: team.DIVISIONS, presets: team.PRESETS, models: team.MODELS, limits: {members: team.MAX_MEMBERS, perDivision: team.PER_DIVISION}, canEdit: role === 'owner'});
+  // Saving the team: renamed people keep their tasks; removed people's tasks stay and wait to be moved.
+  if (url.pathname === '/api/team' && req.method === 'PUT') {
+    if (role !== 'owner') return send(res, 403, {error: 'Only the workspace owner can change the team.'});
+    const {team: next, renames} = team.validate((await readJson(req))?.team, space.team);
+    if (Object.keys(renames).length) {
+      // A renamed agent's run in progress is dropped (its result would not match), so that task starts again.
+      for (const task of tasks) { if (renames[task.assignee]) { if (task.status === 'active' && task.runId) Object.assign(task, {status: 'queued', runId: null, version: (task.version || 0) + 1}); task.assignee = renames[task.assignee]; } if (task.handoff && renames[task.handoff.assignee]) task.handoff.assignee = renames[task.handoff.assignee]; }
+      save();
+    }
+    space.saveTeam(next); kick(); return send(res, 200, {team: next});
+  }
   if (url.pathname === '/api/reviews' && req.method === 'POST') {
     const input=await readJson(req),names=input?.members;
     if(!Array.isArray(names)||!names.length||names.length>6||new Set(names).size!==names.length||names.some(n=>!MEMBERS.has(n)))return send(res,400,{error:'Choose 1–6 different team members.'});
@@ -152,7 +163,7 @@ async function api(req, res, url, space) {
   }
   if (url.pathname === '/api/tasks/batch' && req.method === 'POST') {
     const input=await readJson(req),list=input?.tasks;
-    if(!Array.isArray(list)||!list.length||list.length>13)return send(res,400,{error:'Choose 1–13 tasks.'});
+    if(!Array.isArray(list)||!list.length||list.length>team.MAX_MEMBERS)return send(res,400,{error:`Choose 1–${team.MAX_MEMBERS} tasks.`});
     const added=list.map(item=>newTask({...item,status:'queued',result:''}));
     if(added.some(t=>!t||!MEMBERS.has(t.assignee)))return send(res,400,{error:'Every task needs a title and a known assignee.'});
     tasks.unshift(...added);save();send(res,201,added);setImmediate(kick);return;
@@ -169,7 +180,7 @@ async function api(req, res, url, space) {
     return send(res,200,{mode:DRY_RUN?'dry-run':'claude',createdAt:now(),notes});
   }
   if (url.pathname === '/api/agents' && req.method === 'GET')
-    return send(res, 200, {mode: DRY_RUN ? 'dry-run' : 'claude', model: DRY_RUN ? null : MODEL, members: Object.fromEntries(Object.entries(agents).map(([name, a]) => [name, {role: a.role, model: modelOf(a)}]))});
+    return send(res, 200, {mode: DRY_RUN ? 'dry-run' : 'claude', model: DRY_RUN ? null : MODEL, members: Object.fromEntries(Object.entries(agents).map(([name, a]) => [name, {role: a.role, preset: a.preset, model: modelOf(a)}]))});
   if (url.pathname === '/api/tasks' && req.method === 'GET') return send(res, 200, tasks);
   if (url.pathname === '/api/tasks' && req.method === 'POST') {
     const input=await readJson(req);
@@ -267,23 +278,23 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== 'GET' && !sameSite(req)) return send(res, 403, {error: 'Requests must come from this site as JSON.'});
     if (LOCAL) {
       if (url.pathname === '/api/me') return send(res, 200, {local: true, user: null, role: 'owner', workspace: {id: LOCAL_WORKSPACE, name: 'This computer'}, members: [], usage: usage(LOCAL_WORKSPACE)});
-      return await api(req, res, url, store.space(LOCAL_WORKSPACE));
+      return await api(req, res, url, store.space(LOCAL_WORKSPACE), 'owner');
     }
     if (await accounts.publicRoutes(req, res, url) !== false) return;
     const who = accounts.session(req);
     if (!who) return send(res, 401, {error: 'Sign in to continue.'});
     if (await accounts.memberRoutes(req, res, url, who, usage) !== false) return;
-    await api(req, res, url, store.space(who.workspaceId));
+    await api(req, res, url, store.space(who.workspaceId), who.role);
   } catch (error) { send(res, error.status || 500, {error: error.status ? error.message : 'Server error.'}); if (!error.status) console.error(error); }
 });
 server.listen(PORT, HOST, () => {
   console.log(`Kantor Kita: http://${HOST}:${PORT}`);
   console.log(LOCAL ? 'Local mode: no sign-in, one workspace on this machine.' : `Accounts on. Sign-up: ${process.env.OPEN_SIGNUP === '1' ? 'open to anyone' : 'first workspace, then invite links only'}.`);
-  console.log(DRY_RUN ? 'AI agents: dry run (set ANTHROPIC_API_KEY in .env to use Claude)' : `AI agents: ${Object.entries(agents).map(([name, a]) => `${name} → ${modelOf(a)}`).join(', ')} · ${AI_DAILY_LIMIT} requests per workspace per day`);
+  console.log(DRY_RUN ? 'AI agents: dry run (set ANTHROPIC_API_KEY in .env to use Claude)' : `AI agents: Claude, set per workspace · ${AI_DAILY_LIMIT} requests per workspace per day`);
   // Tasks left active by a previous run go back to the queue and are picked up again.
   for (const id of store.workspaceIds()) {
     const space = store.space(id);
-    let reset = false; space.tasks.forEach(task => { if (task.status === 'active' && agents[task.assignee]) { task.status = 'queued'; reset = true; } }); if (reset) space.save();
+    let reset = false; space.tasks.forEach(task => { if (task.status === 'active' && space.agents[task.assignee]) { task.status = 'queued'; reset = true; } }); if (reset) space.save();
     kickSpace(space);
   }
 });

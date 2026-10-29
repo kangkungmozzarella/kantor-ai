@@ -13,7 +13,7 @@
     team=people;groups=divisions;
     el('officeMood').value=preferences.mood;el('celebrations').checked=preferences.celebrate;
     for(const [key,group] of Object.entries(groups)){const o=new Option(group.name,key);el('briefDivision').add(o);}
-    team.forEach((person,i)=>{for(const id of ['coffeeFirst','coffeeSecond'])el(id).add(new Option(`${person.initials} · ${person.role}`,person.n));const li=document.createElement('li');li.textContent=`${person.initials} · ${habits[i]}`;el('personalityList').append(li);});
+    team.forEach((person,i)=>{for(const id of ['coffeeFirst','coffeeSecond'])el(id).add(new Option(`${person.initials} · ${person.role}`,person.n));const li=document.createElement('li');li.textContent=`${person.initials} · ${habits[i%habits.length]}`;el('personalityList').append(li);});
     el('coffeeSecond').selectedIndex=1;
     el('bLife').onclick=()=>{coffeeAvailability();el('lifeDialog').showModal();el('closeLife').focus();};el('closeLife').onclick=()=>el('lifeDialog').close();
     el('officeMood').onchange=()=>{preferences.mood=el('officeMood').value;save();};el('celebrations').onchange=()=>{preferences.celebrate=el('celebrations').checked;save();};
@@ -36,8 +36,8 @@
     el('divisionForm').onsubmit=event=>{
       event.preventDefault();const goal=el('divisionGoal').value.trim(),context=el('divisionContext').value.trim();if(!goal||!context){feedback('Enter a goal and context.');return;}
       const members=team.filter(p=>p.group===el('briefDivision').value);
-      allocation=members.map(p=>({title:`${goal} · ${p.role}`.slice(0,160),assignee:p.n,brief:`Shared goal: ${goal}\n\nConfirmed context:\n${context}\n\nYour contribution (${p.role}): ${contributions[p.role]}.\nCoordinate with: ${members.filter(m=>m!==p).map(m=>m.role).join(', ')}.\nReturn a draft for human review. Flag missing facts; do not invent them or publish anything.`}));
-      el('divisionPreview').replaceChildren(...allocation.map(d=>paragraph(`${team.find(p=>p.n===d.assignee).initials}: ${contributions[team.find(p=>p.n===d.assignee).role]}${window.officeTasks.agentFor(d.assignee)?' · AI draft':' · Manual task'}`)));
+      allocation=members.map(p=>({title:`${goal} · ${p.role}`.slice(0,160),assignee:p.n,brief:`Shared goal: ${goal}\n\nConfirmed context:\n${context}\n\nYour contribution (${p.role}): ${(contributions[p.role]||`Contribute from your role as ${p.role}`)}.\nCoordinate with: ${members.filter(m=>m!==p).map(m=>m.role).join(', ')}.\nReturn a draft for human review. Flag missing facts; do not invent them or publish anything.`}));
+      el('divisionPreview').replaceChildren(...allocation.map(d=>paragraph(`${team.find(p=>p.n===d.assignee).initials}: ${(contributions[team.find(p=>p.n===d.assignee).role]||`Contribute from your role as ${team.find(p=>p.n===d.assignee).role}`)}${window.officeTasks.agentFor(d.assignee)?' · AI draft':' · Manual task'}`)));
       el('createDivision').hidden=false;feedback('Allocation follows each role. Review it before creating the tasks.');
     };
     el('createDivision').onclick=async()=>{const button=el('createDivision'),current=revision,count=allocation.length;if(!count)return;button.disabled=true;try{await window.officeTasks.createBatch(allocation);if(current===revision)invalidate();feedback(`${count} division tasks created.`);}catch(error){feedback(error.message);}finally{button.disabled=false;}};

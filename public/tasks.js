@@ -260,7 +260,7 @@
       if(task.history?.length){const history=node('details'),summary=node('summary',`Draft history (${task.history.length})`);history.append(summary);task.history.forEach((draft,i)=>{history.append(node('h4',`Draft ${i+1} · ${draft.by||'Saved'}`));if(draft.feedback)history.append(node('p',`Revision brief: ${draft.feedback}`));history.append(node('div',draft.result,'task-result'));});article.append(history);}
       const actions = node('div', undefined, 'task-actions');
       if (!team.some(person => person.n === task.assignee)) {
-        article.append(node('p', 'This assignee comes from an old prototype. Pick a team member to continue.'));
+        article.append(node('p', 'This person is no longer on the team. Pick a team member to continue.'));
         const select = node('select'); select.setAttribute('aria-label', `New assignee for ${task.title}`);
         for (const person of team) { const option = node('option', displayName(person.n)); option.value = person.n; select.append(option); }
         actions.append(action('Move task', () => reassign(task.id, select.value)));
@@ -333,7 +333,7 @@
   window.officeTasks = {
     openTask(id){const task=tasks.find(t=>t.id===id);if(!task)return;this.open(task.assignee,task.status);const article=document.getElementById(`task-${id}`);article?.scrollIntoView({block:'nearest'});article?.focus();},
     async createBatch(drafts) {
-      if (!Array.isArray(drafts) || !drafts.length || drafts.length > 13 || drafts.some(d => !d.title?.trim() || d.title.length > 160 || !team.some(p => p.n === d.assignee))) throw new Error('Invalid task allocation.');
+      if (!Array.isArray(drafts) || !drafts.length || drafts.length > team.length || drafts.some(d => !d.title?.trim() || d.title.length > 160 || !team.some(p => p.n === d.assignee))) throw new Error('Invalid task allocation.');
       if (server) { const saved = await call('POST', '/api/tasks/batch', {tasks:drafts}); apply([...saved, ...tasks]); }
       else { const added=drafts.map(d=>({id:crypto.randomUUID(),title:d.title,brief:d.brief||'',assignee:d.assignee,status:'queued',result:'',createdAt:new Date().toISOString()})); if(!persist([...added,...tasks])) throw new Error('Tasks could not be saved.'); }
       render();
@@ -367,7 +367,7 @@
         }
       } catch { storageHealthy = false; feedback('Task data cannot be read. The old data is kept; changes are blocked.'); }
       for (const name of new Set(tasks.filter(task => !team.some(person => person.n === task.assignee)).map(task => task.assignee))) {
-        const option = node('option', `${name} (old prototype)`); option.value = name; el('agentFilter').append(option);
+        const option = node('option', `${name} (not on the team)`); option.value = name; el('agentFilter').append(option);
       }
       el('closeTasks').onclick = () => el('taskDialog').close();
       el('stallHours').value = String(stallHours);

@@ -40,7 +40,8 @@
     engineering: {name:'Engineering & Design', x:-5.5, z:6.5, color:0x3f7a58},
     service: {name:'Customer Service', x:5.5, z:6.5, color:0x74598c}
   };
-  const TEAM = [
+  // The default team; with the server, each workspace's own team replaces it before the office is built.
+  let TEAM = [
     {n:'Koh Arman', initials:'KA', gender:'male', role:'CEO', group:'leadership'},
     {n:'Koh Wira', initials:'KW', gender:'male', role:'CTO', group:'leadership'},
     {n:'Kak Rani', initials:'KR', gender:'female', role:'Social Media Specialist', group:'marketing'},
@@ -55,6 +56,15 @@
     {n:'Kak Sinta', initials:'KS', gender:'female', role:'Customer Service', group:'service'},
     {n:'Kak Laras', initials:'KL', gender:'female', role:'Customer Service', group:'service'}
   ];
+  try {
+    const response=await fetch('/api/team',{cache:'no-store'});
+    if(response.status===401){location.href='/login.html';return;}
+    if(response.ok&&response.headers.get('content-type')?.includes('application/json')){
+      // Hair is the only look setting: long or short.
+      const {team}=await response.json();if(Array.isArray(team)&&team.length)TEAM=team.map(p=>({n:p.name,initials:p.initials,gender:p.look==='long'?'female':'male',role:p.role,group:p.division}));
+    }
+  } catch { /* no server: keep the default team */ }
+  document.querySelector('.brand-meta').textContent=`${TEAM.length} ${TEAM.length===1?'person':'people'} · 4 floors`;
   const softShapes=new Map();
   const floors = {}, materials = new Map(), agents = [];
   const monitorDisplays=[],decorations={chairs:[],rugs:[],plants:[]};
@@ -1211,7 +1221,7 @@
     const open=kind=>hangouts.filter(s=>s.state===kind&&!s.occupant);
     const prefer=list=>{const mates=list.filter(o=>o.group===agent.group);return mates.length&&Math.random()<.6?mates:list;};
     const away=agents.filter(a=>a.activity).length,roll=Math.random();
-    const habit=window.officeLife.habits[agent.index];
+    const habit=window.officeLife.habits[agent.index%window.officeLife.habits.length];
     if(roll<.6){
       const preferred={'Coffee regular':'drink','Idea board reader':'look','Lounge thinker':'lounge','Stretch break regular':'stretch','Plant caretaker':'water'}[habit];
       if(preferred==='stretch'){assign(agent,agent.stretchSpot,rand(3.5,6));log(`${agent.n} takes a favourite stretch break`,agent.group);return;}
@@ -1498,7 +1508,7 @@
     const close=document.createElement('button');close.id='iClose';close.textContent='×';close.setAttribute('aria-label','Close details');close.onclick=()=>selectAgent(null);
     const heading=document.createElement('h2');heading.textContent=agent.initials;
     const role=document.createElement('p');role.className='role';role.textContent=agent.role;
-    const habit=document.createElement('p');habit.className='role';habit.textContent=`Simulated habit: ${window.officeLife.habits[agent.index]}`;
+    const habit=document.createElement('p');habit.className='role';habit.textContent=`Simulated habit: ${window.officeLife.habits[agent.index%window.officeLife.habits.length]}`;
     // Members connected to an AI agent on the server say so; everyone else stays a labelled simulation.
     const ai=window.officeTasks.agentFor(agent.n);
     if(ai){const badge=document.createElement('span');badge.className='ai-badge';badge.textContent=ai.mode==='claude'?`AI agent · ${ai.model.replace(/^claude-/,'').replace(/-\d{8}$/,'').replace(/-(\d+)-(\d+)$/,' $1.$2').replace(/^\w/,c=>c.toUpperCase())}`:'AI agent · dry run';role.append(badge);}

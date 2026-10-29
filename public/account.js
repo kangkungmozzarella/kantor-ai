@@ -20,9 +20,11 @@
     $('accountPeople').hidden = !!me.local; $('signOut').hidden = !!me.local;
     $('accountMembers').replaceChildren(...me.members.map(m => { const item = node('li'); item.append(node('strong', m.name), node('span', `${m.email} · ${m.role}`)); return item; }));
     $('accountInvite').hidden = me.role !== 'owner';
+    $('accountTeam').hidden = me.role !== 'owner';
   }
   $('bAccount').onclick = async () => { await load(); $('accountFeedback').textContent = ''; $('accountDialog').showModal(); $('closeAccount').focus(); };
   $('closeAccount').onclick = () => $('accountDialog').close();
+  $('editTeam').onclick = () => { $('accountDialog').close(); window.officeTeam.open(); };
   $('createInvite').onclick = async () => {
     try {
       const response = await fetch('/api/invites', {method: 'POST', headers: {'content-type': 'application/json'}, body: '{}'}), data = await response.json();

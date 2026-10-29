@@ -96,7 +96,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
  }
  await page.evaluate(()=>localStorage.setItem('kantor-ai.tasks.v1',JSON.stringify([{id:'old-task',title:'Tugas lama',assignee:'Sari',status:'active',brief:'',result:'',createdAt:new Date().toISOString()}])));
  await page.reload();await page.waitForFunction(()=>window.officeScene);await page.click('#bTasks');
- assert.match(await page.locator('#taskList').innerText(),/old prototype/);
+ assert.match(await page.locator('#taskList').innerText(),/no longer on the team/);
  await page.locator('.task-item select').selectOption('Kak Rani');await page.getByRole('button',{name:'Move task'}).click();
  assert.match(await page.locator('#taskList').innerText(),/KR/);
  await page.getByRole('button',{name:'Start task',exact:true}).click();

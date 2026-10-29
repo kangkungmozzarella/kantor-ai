@@ -57,7 +57,7 @@ Tugas dengan nama karakter prototipe lama tetap disimpan dan dapat dipindahkan k
 
 ## Server tugas dan agen AI
 
-Dengan server, tugas disimpan di `data/kantor.db` (SQLite, per workspace) dan anggota yang tersambung ke agen AI mengerjakan tugasnya sendiri. Saat ini **Social Media Specialist** dan **Customer Service**; daftarnya ada di `server/agents.js`. Anggota lain tetap simulasi dengan status yang diubah manual.
+Dengan server, tugas disimpan di `data/kantor.db` (SQLite, per workspace) dan anggota yang tersambung ke agen AI mengerjakan tugasnya sendiri. Bawaannya **Social Media Specialist** dan **Customer Service**; pemilik workspace bisa mengubahnya lewat **Office team** (lihat di bawah). Anggota lain tetap simulasi dengan status yang diubah manual.
 
 ```sh
 cp .env.example .env   # isi ANTHROPIC_API_KEY dari console.anthropic.com → API Keys
@@ -93,7 +93,8 @@ Model bawaan adalah `claude-sonnet-5-5`; ganti dengan `ANTHROPIC_MODEL` di `.env
 - `public/tasks.css`: panel tugas responsif, fokus keyboard, dan gaya formulir.
 - `public/music.js`: komposisi instrumental, kontrol putar/mati, dan volume.
 - `server/server.js`: server lokal (file statis + API tugas) dan pekerja agen AI.
-- `server/agents.js`: anggota yang tersambung ke agen AI beserta instruksinya.
+- `server/team.js`: tim bawaan, preset agen AI, daftar model dan validasi tim per workspace.
+- `server/store.js` dan `server/accounts.js`: penyimpanan SQLite serta akun, sesi dan undangan.
 
 ## Pemeriksaan browser
 
@@ -183,6 +184,20 @@ Server menyimpan data di `data/kantor.db` memakai SQLite bawaan Node 22 (`node:s
 - **Keamanan permintaan**: semua penulisan harus berupa JSON dari situs yang sama (header `Origin` dicek), sehingga form atau skrip dari situs lain tidak bisa memakai sesi. Percobaan masuk atau daftar dibatasi 10 per email dan 50 per alamat jaringan setiap 15 menit. Di belakang reverse proxy, set `TRUST_PROXY=1` supaya alamat asli dan https terbaca.
 - **`LOCAL_MODE=1`**: tanpa login, satu workspace di laptop ini, seperti sebelumnya. Mode ini menolak berjalan bila `HOST` bukan alamat lokal. Tes yang menyalakan server memakai mode ini.
 
-Belum termasuk (tahap berikutnya): tim dan agen yang bisa diatur per workspace (sekarang semua workspace memakai 13 karakter dan dua agen bawaan), reset password lewat email, menghapus anggota dari UI, billing, dan deploy. Server menyimpan tugas per workspace di memori proses, jadi jalankan satu proses saja.
+Belum termasuk (tahap berikutnya): reset password lewat email, menghapus anggota dari UI, billing, dan deploy. Server menyimpan tugas per workspace di memori proses, jadi jalankan satu proses saja.
 
 `tests/accounts.cjs` memakai provider Claude tiruan untuk memeriksa daftar/masuk/keluar, cookie sesi, penjaga lintas situs, undangan sekali pakai, peran owner/member, pemisahan workspace, batas percobaan, kuota AI per workspace, pendaftaran khusus undangan, impor tugas lama, serta alur masuk dan panel Account di browser.
+
+## Tim dan agen per workspace
+
+Setiap workspace punya timnya sendiri. Tim bawaan berisi 13 orang yang sama seperti sebelumnya. Pemilik membukanya lewat **Account → Edit team** (di `LOCAL_MODE`, pengguna laptop dianggap pemilik).
+
+- **Per orang**: nama, inisial (1–4 huruf/angka, unik), peran, divisi, dan rambut (panjang/pendek). Inisial terisi otomatis dari nama untuk orang baru.
+- **Kapasitas kantor**: paling banyak 14 orang (kursi makan dan tempat rooftop) dan 4 orang per divisi (satu meja kelompok). Editor menampilkan hitungannya, dan server menolak tim yang melebihi batas.
+- **Agen AI**: tiap orang bisa dibiarkan sebagai simulasi atau diberi agen: **Social media drafts**, **Customer service replies**, atau **Custom instructions**. Pilih model Claude (Sonnet 5.5, Haiku 5.5, Opus 5.5 atau Haiku 4.5), dan tambahkan instruksi workspace. Agen custom wajib punya instruksi. Semua agen tetap mengikuti aturan bersama: bertanya bila brief kurang, tidak mengaku mengirim atau memposting, dan boleh menyarankan serah-terima. Setiap draf memakai kuota harian workspace; tanpa API key semuanya dry run gratis.
+- **Mengganti nama** memindahkan tugas lama ke nama baru. Bila agen yang di-rename sedang bekerja, tugasnya kembali ke antrean dan dikerjakan ulang. **Menghapus orang** tidak menghapus tugasnya: kartu tugas meminta tugas itu dipindahkan ke anggota tim, dan orang yang sudah dihapus tidak bisa diberi tugas baru.
+- Menyimpan tim memuat ulang kantor supaya meja, avatar dan label mengikuti tim baru. Anggota (bukan pemilik) bisa melihat tim, tetapi tidak bisa mengubahnya.
+
+Tim disimpan di kolom `team` tabel `workspaces` (`server/team.js` berisi tim bawaan, preset agen, daftar model dan validasi).
+
+`tests/team.cjs` memeriksa tim per workspace, batas 14 orang/4 per divisi, inisial ganda, agen custom tanpa instruksi, model tak dikenal, rename yang membawa tugas, agen custom yang menulis draf, orang yang dihapus tidak bisa diberi tugas, edit khusus pemilik, workspace lain tetap memakai timnya, serta editor di browser yang menyimpan dan memuat ulang kantor.

@@ -23,3 +23,17 @@
 .account-members{list-style:none;margin:0;padding:0}.account-members li{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #e6dfd2;overflow-wrap:anywhere}.account-members li span{color:#6b6459}
 .account-hint{color:#6b6459;font-size:13px}#accountDialog input{box-sizing:border-box;width:100%;min-height:44px;padding:10px;background:#fffdf8;border:1px solid #827c71;border-radius:5px;font:inherit}
 #accountFeedback{color:#385747}#signOut{background:#fff;color:#2a2622}
+#teamDialog{width:min(980px,calc(100% - 24px))}
+.team-summary{font-weight:600;color:#385747}
+.team-row{margin:0 0 14px;padding:14px 16px;border:1px solid #c9c2b6;border-radius:8px;background:#fbf8f2;display:grid;grid-template-columns:2fr .8fr 2fr 1.6fr 1fr;gap:4px 14px;align-items:end}
+.team-row legend{font-weight:700;padding:0 6px}.team-row label{margin:6px 0 4px!important;font-size:13px}
+.team-row input,.team-row select,.team-row textarea,#teamDialog .team-row input{box-sizing:border-box;width:100%;min-height:42px;padding:8px 10px;background:#fffdf8;color:#2a2622;border:1px solid #827c71;border-radius:5px;font:inherit}
+.team-row .team-agent{grid-column:1/-1;display:grid;grid-template-columns:1.4fr 1.4fr 3fr auto;gap:4px 14px;align-items:end}
+.team-row .team-agent textarea{min-height:42px;resize:vertical}
+#teamDialog .team-row button.team-remove{margin:0;background:#fff;color:#8a3420;border-color:#c9a59a}
+#teamDialog button.team-save{background:#e8634a;border-color:#e8634a}
+#teamFeedback{color:#385747;white-space:pre-wrap;margin:8px 0 0}#teamFeedback:empty{display:none}#teamFeedback.error{color:#a33a24}
+@media(max-width:800px){.team-row,.team-row .team-agent{grid-template-columns:1fr 1fr}.team-row .team-agent>*:nth-child(3){grid-column:1/-1}}
+@media(max-width:480px){.team-row,.team-row .team-agent{grid-template-columns:1fr}}
+.team-actions{position:sticky;bottom:-24px;margin:0 -24px -24px;padding:4px 24px 16px;background:#f7f3eb;border-top:1px solid #d7cec0}
+@media(max-width:700px){.team-actions{bottom:-20px;margin:0 -16px -20px;padding:4px 16px 14px}}

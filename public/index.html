@@ -89,16 +89,23 @@
   <dialog id="reviewDialog" class="studio-dialog" aria-labelledby="reviewHeading"><header class="task-header"><div><h1 id="reviewHeading">Review meeting</h1><p>Discuss an existing draft. Approval stays in Tasks.</p></div><button id="closeReview" type="button">Close</button></header><form id="reviewMeetingForm"><label for="reviewTask">Draft to discuss</label><select id="reviewTask" required></select><pre id="reviewSource"></pre><fieldset id="reviewPeople"><legend>Invite people · up to 6 meeting seats</legend></fieldset><label for="reviewFocus">What should they check?</label><textarea id="reviewFocus" rows="3" maxlength="2000" placeholder="For example: clarity, missing facts and customer questions"></textarea><label class="studio-check"><input id="reviewUseAI" type="checkbox"> Ask connected agents for feedback</label><p id="reviewAvailability"></p><button type="submit">Start review meeting</button><button id="endReview" type="button">Send invitees back to work</button></form><p id="reviewFeedback" role="status"></p><pre id="reviewNotes" tabindex="0"></pre><button id="downloadReview" type="button" hidden>Download review notes</button></dialog>
   <dialog id="accountDialog" class="studio-dialog" aria-labelledby="accountHeading"><header class="task-header"><div><h1 id="accountHeading">Workspace</h1><p id="accountWho"></p></div><button id="closeAccount" type="button">Close</button></header>
     <section><h2>AI usage today</h2><p id="accountUsage"></p></section>
+    <section id="accountTeam" hidden><h2>Office team</h2><p class="account-hint">Who sits in the office, their divisions, and which of them draft with Claude.</p><button id="editTeam" type="button">Edit team</button></section>
     <section id="accountPeople"><h2>People with access</h2><ul id="accountMembers" class="account-members"></ul>
       <div id="accountInvite" hidden><button id="createInvite" type="button">Create invite link</button><p class="account-hint">Each link works once, for 7 days. Anyone with the link can join this workspace.</p><label for="inviteLink">Invite link</label><input id="inviteLink" readonly hidden><button id="copyInvite" type="button" hidden>Copy link</button></div></section>
     <p id="accountFeedback" role="status"></p>
     <button id="signOut" type="button" hidden>Sign out</button>
+  </dialog>
+  <dialog id="teamDialog" class="studio-dialog" aria-labelledby="teamHeading"><header class="task-header"><div><h1 id="teamHeading">Office team</h1><p>People in this workspace's office. Saving reloads the office.</p></div><button id="closeTeam" type="button">Close</button></header>
+    <p class="account-hint">AI agents draft with Claude, and every draft counts toward the workspace's daily limit. Without an API key they run as a free dry run. A person still reviews every draft.</p>
+    <p id="teamSummary" class="team-summary"></p>
+    <form id="teamForm"><div id="teamRows"></div><div class="team-actions"><button id="addMember" type="button">Add person</button><button type="submit" class="team-save">Save team</button><p id="teamFeedback" role="status"></p></div></form>
   </dialog>
   <div id="tourBar" class="panel" hidden><span id="tourLabel"></span><button id="stopTour" class="btn" type="button">Stop tour</button></div>
   <script src="tasks.js"></script>
   <script src="life.js"></script>
   <script src="studio.js"></script>
   <script src="music.js"></script>
+  <script src="team.js"></script>
   <script src="account.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="office.js"></script>

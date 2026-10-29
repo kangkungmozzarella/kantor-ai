@@ -1,6 +1,7 @@
 // SQLite storage (built into Node 22): accounts, workspaces, sessions, invites, daily AI usage,
 // and each workspace's task list. Tasks keep their JSON shape; each one is a row in its workspace.
 const {DatabaseSync} = require('node:sqlite');
+const {DEFAULT_TEAM, agentsOf} = require('./team');
 
 const SCHEMA = `
 pragma journal_mode = wal;
@@ -18,6 +19,8 @@ create table if not exists usage (workspace_id text not null references workspac
 function open(file) {
   const db = new DatabaseSync(file);
   db.exec(SCHEMA);
+  // Workspaces created before team settings existed get the column; null means the default team.
+  if (!db.prepare('pragma table_info(workspaces)').all().some(column => column.name === 'team')) db.exec('alter table workspaces add column team text');
   const q = sql => db.prepare(sql);
   const clear = q('delete from tasks where workspace_id = ?'), insert = q('insert into tasks (id, workspace_id, position, data) values (?, ?, ?, ?)');
   const spaces = new Map();
@@ -26,7 +29,10 @@ function open(file) {
   function space(id) {
     if (spaces.has(id)) return spaces.get(id);
     const tasks = q('select data from tasks where workspace_id = ? order by position').all(id).map(row => JSON.parse(row.data));
-    const s = {id, tasks, durable: JSON.stringify(tasks), busy: new Set()};
+    const saved = q('select team from workspaces where id = ?').get(id)?.team;
+    const s = {id, tasks, durable: JSON.stringify(tasks), busy: new Set(), team: saved ? JSON.parse(saved) : structuredClone(DEFAULT_TEAM)};
+    s.agents = agentsOf(s.team);
+    s.saveTeam = team => { q('update workspaces set team = ? where id = ?').run(JSON.stringify(team), id); s.team = team; s.agents = agentsOf(team); };
     s.save = () => {
       try {
         db.exec('begin');
